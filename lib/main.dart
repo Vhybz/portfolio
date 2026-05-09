@@ -855,15 +855,14 @@ class HeroSection extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 48),
-          Row(
-            mainAxisAlignment: isMobile ? MainAxisAlignment.center : MainAxisAlignment.start,
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 15,
+            runSpacing: 15,
             children: const [
               SocialIconButton(icon: Icons.code, url: 'https://github.com/Vhybz'),
-              SizedBox(width: 15),
               SocialIconButton(icon: Icons.chat_bubble_outline, url: 'https://wa.me/233559650921'),
-              SizedBox(width: 15),
               SocialIconButton(icon: Icons.link, url: 'https://linkedin.com'),
-              SizedBox(width: 15),
               SocialIconButton(icon: Icons.email_outlined, url: 'mailto:techraven11@gmail.com'),
             ],
           ),
@@ -874,45 +873,47 @@ class HeroSection extends StatelessWidget {
 
   Widget _buildImage(BuildContext context, bool isMobile) {
     final size = MediaQuery.of(context).size;
-    final imageSize = isMobile ? size.width * 0.7 : 420.0;
+    final imageSize = isMobile ? size.width * 0.7 : math.min(size.width * 0.3, 420.0);
     
     return FadeInAnimation(
       delay: 300,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          _glowCircle(imageSize * 1.3, 0.1),
-          _glowCircle(imageSize * 1.15, 0.05),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: const Color(0xFFE50914).withAlpha(30), width: 2),
-            ),
-            child: Container(
-              key: profilePicKey,
-              width: imageSize,
-              height: imageSize,
+      child: Center(
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            _glowCircle(imageSize * 1.3, 0.1),
+            _glowCircle(imageSize * 1.15, 0.05),
+            Container(
+              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                border: Border.all(color: const Color(0xFFE50914), width: 6),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFFE50914).withAlpha(80),
-                    blurRadius: 40,
-                    spreadRadius: 5,
-                  ),
-                ],
+                border: Border.all(color: const Color(0xFFE50914).withAlpha(30), width: 2),
               ),
-              clipBehavior: Clip.antiAlias,
-              child: Image.asset(
-                'assets/images/pic.jpg',
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => const Icon(Icons.person, size: 100, color: Colors.white10),
+              child: Container(
+                key: profilePicKey,
+                width: imageSize,
+                height: imageSize,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: const Color(0xFFE50914), width: 6),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFE50914).withAlpha(80),
+                      blurRadius: 40,
+                      spreadRadius: 5,
+                    ),
+                  ],
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: Image.asset(
+                  'assets/images/pic.jpg',
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => const Icon(Icons.person, size: 100, color: Colors.white10),
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -1185,7 +1186,14 @@ class AboutAndSkillsSection extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(s, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
+                Expanded(
+                  child: Text(
+                    s, 
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 10),
                 Text('${(l * 100).toInt()}%', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFFE50914))),
               ],
             ),
@@ -1251,7 +1259,7 @@ class ProjectsSection extends StatelessWidget {
               crossAxisCount: width > 1200 ? 3 : (width > 700 ? 2 : 1),
               crossAxisSpacing: 30,
               mainAxisSpacing: 30,
-              childAspectRatio: isMobile ? 1.1 : 1.25,
+              childAspectRatio: isMobile ? 0.95 : (isTablet ? 1.1 : 1.25),
             ),
             itemCount: 5,
             shrinkWrap: true,
@@ -1372,7 +1380,7 @@ class ServicesSection extends StatelessWidget {
             shrinkWrap: true,
             crossAxisSpacing: 30,
             mainAxisSpacing: 30,
-            childAspectRatio: isMobile ? 1.3 : 1.5,
+            childAspectRatio: isMobile ? 1.1 : 1.5,
             physics: const NeverScrollableScrollPhysics(),
             children: const [
               _SCard(i: Icons.smartphone, t: 'App Development', d: 'High-performance native and cross-platform mobile apps.'),
