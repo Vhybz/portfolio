@@ -427,16 +427,29 @@ class Navbar extends StatelessWidget {
           constraints: const BoxConstraints(maxWidth: 1400),
           padding: EdgeInsets.symmetric(horizontal: width * 0.05, vertical: 20),
           child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _buildLogo(),
-              const Spacer(),
+              Flexible(child: _buildLogo()),
               if (!isMobile) ...[
-                _buildNavItems(),
-                const SizedBox(width: 30),
-                _buildThemeToggle(context),
-                const SizedBox(width: 20),
-                _buildCVButton(context),
+                const Spacer(),
+                Flexible(
+                  flex: 3,
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _buildNavItems(),
+                        const SizedBox(width: 20),
+                        _buildThemeToggle(context),
+                        const SizedBox(width: 15),
+                        _buildCVButton(context),
+                      ],
+                    ),
+                  ),
+                ),
               ] else ...[
+                const Spacer(),
                 _buildThemeToggle(context, small: true),
                 IconButton(
                   icon: const Icon(Icons.menu_rounded),
@@ -456,6 +469,7 @@ class Navbar extends StatelessWidget {
       child: GestureDetector(
         onTap: () => onItemTap(keys['Home']!),
         child: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
             Container(
               padding: const EdgeInsets.all(8),
@@ -465,8 +479,14 @@ class Navbar extends StatelessWidget {
               ),
               child: Image.asset('assets/images/rev.jpg', height: 32, errorBuilder: (_, __, ___) => const Icon(Icons.auto_awesome, color: Color(0xFFE50914), size: 24)),
             ),
-            const SizedBox(width: 16),
-            const Text('TECH RAVEN', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, letterSpacing: 3)),
+            const SizedBox(width: 12),
+            const Flexible(
+              child: Text(
+                'TECH RAVEN', 
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: 2),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
           ],
         ),
       ),
@@ -955,7 +975,7 @@ class _ActionButtonState extends State<_ActionButton> {
           style: ElevatedButton.styleFrom(
             backgroundColor: widget.isPrimary ? const Color(0xFFE50914) : Colors.transparent,
             foregroundColor: widget.isPrimary ? Colors.white : Theme.of(context).colorScheme.primary,
-            padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
+            padding: EdgeInsets.symmetric(horizontal: MediaQuery.of(context).size.width < 600 ? 20 : 40, vertical: 24),
             elevation: 0,
             side: widget.isPrimary ? null : BorderSide(color: Theme.of(context).colorScheme.primary.withAlpha(100)),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -967,9 +987,12 @@ class _ActionButtonState extends State<_ActionButton> {
                 Icon(widget.icon, size: 20),
                 const SizedBox(width: 10),
               ],
-              Text(
-                widget.label,
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              Flexible(
+                child: Text(
+                  widget.label,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ],
           ),
@@ -1265,6 +1288,7 @@ class _PCard extends StatefulWidget {
 class _PCardState extends State<_PCard> {
   bool h = false;
   @override Widget build(BuildContext context) {
+    final isMobile = Responsive.isMobile(context);
     return MouseRegion(
       onEnter: (_) => setState(() => h = true),
       onExit: (_) => setState(() => h = false),
@@ -1289,11 +1313,15 @@ class _PCardState extends State<_PCard> {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.all(32),
+              padding: EdgeInsets.all(isMobile ? 24 : 32),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(widget.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
+                  Text(
+                    widget.title, 
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                   const SizedBox(height: 12),
                   Wrap(
                     spacing: 8,
@@ -1304,7 +1332,11 @@ class _PCardState extends State<_PCard> {
                         color: const Color(0xFFE50914).withAlpha(15),
                         borderRadius: BorderRadius.circular(6),
                       ),
-                      child: Text(t, style: const TextStyle(fontSize: 12, color: Color(0xFFE50914), fontWeight: FontWeight.w600)),
+                      child: Text(
+                        t, 
+                        style: const TextStyle(fontSize: 11, color: Color(0xFFE50914), fontWeight: FontWeight.w600),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     )).toList(),
                   ),
                 ],
@@ -1361,8 +1393,9 @@ class ServicesSection extends StatelessWidget {
   const _SCard({required this.i, required this.t, required this.d});
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
     return Container(
-      padding: const EdgeInsets.all(32),
+      padding: EdgeInsets.all(isMobile ? 24 : 32),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(24),
@@ -1381,9 +1414,18 @@ class ServicesSection extends StatelessWidget {
             child: Icon(i, color: const Color(0xFFE50914), size: 28),
           ),
           const SizedBox(height: 24),
-          Text(t, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+          Text(
+            t, 
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+            overflow: TextOverflow.ellipsis,
+          ),
           const SizedBox(height: 12),
-          Text(d, style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color?.withAlpha(200), height: 1.5)),
+          Text(
+            d, 
+            style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color?.withAlpha(200), height: 1.5),
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+          ),
         ],
       ),
     );
