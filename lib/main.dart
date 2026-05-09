@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 import 'package:url_launcher/url_launcher.dart';
 import 'receipt_page.dart';
 import 'resume_page.dart';
 import 'responsive.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const MyApp());
 }
 
@@ -79,11 +81,13 @@ class _PortfolioPageState extends State<PortfolioPage> {
   final GlobalKey _contactKey = GlobalKey();
 
   void _scrollTo(GlobalKey key) {
-    Scrollable.ensureVisible(
-      key.currentContext!,
-      duration: const Duration(seconds: 1),
-      curve: Curves.easeInOut,
-    );
+    if (key.currentContext != null) {
+      Scrollable.ensureVisible(
+        key.currentContext!,
+        duration: const Duration(seconds: 1),
+        curve: Curves.easeInOut,
+      );
+    }
   }
 
   @override
@@ -138,31 +142,36 @@ class _PortfolioPageState extends State<PortfolioPage> {
                     },
                   ),
                   Center(
-                    child: Column(
-                      children: [
-                        HeroSection(
-                          key: _homeKey, 
-                          profilePicKey: _profilePicKey,
-                          onViewProjects: () => _scrollTo(_projectsKey),
-                        ),
-                        AboutAndSkillsSection(aboutKey: _aboutKey, skillsKey: _skillsKey),
-                        const ProcessSection(),
-                        ProjectsSection(key: _projectsKey),
-                        ServicesSection(key: _servicesKey),
-                        const TestimonialsSection(),
-                        const TechnologiesSection(),
-                        ContactSection(key: _contactKey),
-                        const Footer(),
-                      ],
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 1600),
+                      child: Column(
+                        children: [
+                          HeroSection(
+                            key: _homeKey, 
+                            profilePicKey: _profilePicKey,
+                            onViewProjects: () => _scrollTo(_projectsKey),
+                          ),
+                          AboutAndSkillsSection(aboutKey: _aboutKey, skillsKey: _skillsKey),
+                          ProcessSection(),
+                          ProjectsSection(key: _projectsKey),
+                          ServicesSection(key: _servicesKey),
+                          const TestimonialsSection(),
+                          const TechnologiesSection(),
+                          ContactSection(key: _contactKey),
+                          const Footer(),
+                        ],
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
-            RealisticRaven(
-              targetKey: _profilePicKey,
-              scrollController: _scrollController,
-            ),
+            // We only show the bird on larger screens to avoid mobile clutter
+            if (!Responsive.isMobile(context))
+              RealisticRaven(
+                targetKey: _profilePicKey,
+                scrollController: _scrollController,
+              ),
           ],
         ),
       ),
@@ -196,7 +205,9 @@ class _RealisticRavenState extends State<RealisticRaven> with TickerProviderStat
     _moveController = AnimationController(duration: const Duration(seconds: 4), vsync: this);
     _bobController = AnimationController(duration: const Duration(milliseconds: 500), vsync: this)..repeat(reverse: true);
     
-    _startFlightCycle();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _startFlightCycle();
+    });
     widget.scrollController.addListener(_updatePositionIfStanding);
   }
 
@@ -210,59 +221,75 @@ class _RealisticRavenState extends State<RealisticRaven> with TickerProviderStat
 
   Offset _getTargetPosition() {
     if (widget.targetKey.currentContext != null) {
-      final RenderBox box = widget.targetKey.currentContext!.findRenderObject() as RenderBox;
-      final position = box.localToGlobal(Offset.zero);
-      return Offset(position.dx + box.size.width / 2 - 50, position.dy - 82);
+      try {
+        final RenderBox? box = widget.targetKey.currentContext!.findRenderObject() as RenderBox?;
+        if (box != null && box.hasSize) {
+          final position = box.localToGlobal(Offset.zero);
+          return Offset(position.dx + box.size.width / 2 - 50, position.dy - 82);
+        }
+      } catch (e) {
+        debugPrint('Error getting target position: $e');
+      }
     }
     return _currentPos;
   }
 
   void _startFlightCycle() async {
     while (mounted) {
-      await _flyTo(Offset(_random.nextDouble() * 400 + 100, _random.nextDouble() * 200 + 100), duration: 3);
-      
-      setState(() => _isGliding = true);
-      _flapController.duration = const Duration(milliseconds: 600);
-      await _flyTo(Offset(_currentPos.dx + 200, _currentPos.dy + 20), duration: 2);
-      setState(() => _isGliding = false);
-      _flapController.duration = const Duration(milliseconds: 250);
-
-      if (widget.targetKey.currentContext != null) {
-        _flapController.duration = const Duration(milliseconds: 150);
-        await _flyTo(_getTargetPosition(), duration: 2);
+      try {
+        await _flyTo(Offset(_random.nextDouble() * 400 + 100, _random.nextDouble() * 200 + 100), duration: 3);
         
         if (!mounted) return;
-        setState(() {
-          _isStanding = true;
-          _isGliding = false;
-        });
-        _flapController.stop();
-        _bobController.duration = const Duration(seconds: 1);
+        setState(() => _isGliding = true);
+        _flapController.duration = const Duration(milliseconds: 600);
+        await _flyTo(Offset(_currentPos.dx + 200, _currentPos.dy + 20), duration: 2);
         
-        for (int i = 0; i < 4; i++) {
-          await Future.delayed(Duration(milliseconds: 500 + _random.nextInt(1500)));
+        if (!mounted) return;
+        setState(() => _isGliding = false);
+        _flapController.duration = const Duration(milliseconds: 250);
+
+        if (widget.targetKey.currentContext != null) {
+          _flapController.duration = const Duration(milliseconds: 150);
+          await _flyTo(_getTargetPosition(), duration: 2);
+          
           if (!mounted) return;
           setState(() {
-            _headTurn = (_random.nextDouble() - 0.5) * 0.4;
+            _isStanding = true;
+            _isGliding = false;
           });
+          _flapController.stop();
+          _bobController.duration = const Duration(seconds: 1);
+          
+          for (int i = 0; i < 4; i++) {
+            await Future.delayed(Duration(milliseconds: 500 + _random.nextInt(1500)));
+            if (!mounted) return;
+            setState(() {
+              _headTurn = (_random.nextDouble() - 0.5) * 0.4;
+            });
+          }
+          
+          await Future.delayed(const Duration(seconds: 1));
+          if (!mounted) return;
+          
+          setState(() {
+            _isStanding = false;
+            _headTurn = 0.0;
+          });
+          _flapController.duration = const Duration(milliseconds: 100);
+          _flapController.repeat(reverse: true);
+          await _flyTo(Offset(_currentPos.dx, _currentPos.dy - 100), duration: 1);
+          _flapController.duration = const Duration(milliseconds: 250);
         }
         
-        await Future.delayed(const Duration(seconds: 1));
         if (!mounted) return;
-        
-        setState(() {
-          _isStanding = false;
-          _headTurn = 0.0;
-        });
-        _flapController.duration = const Duration(milliseconds: 100);
-        _flapController.repeat(reverse: true);
-        await _flyTo(Offset(_currentPos.dx, _currentPos.dy - 100), duration: 1);
-        _flapController.duration = const Duration(milliseconds: 250);
+        final screenWidth = MediaQuery.of(context).size.width;
+        await _flyTo(Offset(screenWidth + 200, 150), duration: 3);
+        _currentPos = const Offset(-200, 200);
+        await Future.delayed(const Duration(seconds: 5));
+      } catch (e) {
+        debugPrint('Flight cycle error: $e');
+        await Future.delayed(const Duration(seconds: 5));
       }
-      
-      await _flyTo(Offset(MediaQuery.of(context).size.width + 200, 150), duration: 3);
-      _currentPos = const Offset(-200, 200);
-      await Future.delayed(const Duration(seconds: 5));
     }
   }
 
@@ -350,19 +377,16 @@ class RavenPainter extends CustomPainter {
     final eyePaint = Paint()..color = const Color(0xFF00B2FF)..style = PaintingStyle.fill;
 
     final path = Path();
-    
     canvas.save();
     canvas.translate(size.width / 2, size.height / 2);
 
     path.addOval(Rect.fromCircle(center: Offset(headTurn * 15, -20), radius: 15));
-    
     final beakPath = Path();
     beakPath.moveTo(headTurn * 25 - 5, -25);
     beakPath.lineTo(headTurn * 25 + 5, -25);
     beakPath.lineTo(headTurn * 35, -15);
     beakPath.close();
     path.addPath(beakPath, Offset.zero);
-
     path.addOval(Rect.fromCenter(center: const Offset(0, 5), width: 40, height: 50));
 
     double flap = (flapValue - 0.5) * 2;
@@ -385,7 +409,6 @@ class RavenPainter extends CustomPainter {
       canvas.drawLine(const Offset(-10, 30), const Offset(-15, 45), legPaint);
       canvas.drawLine(const Offset(10, 30), const Offset(15, 45), legPaint);
     }
-
     canvas.drawPath(path, bodyPaint);
 
     double eyeOffsetX = headTurn * 15;
@@ -398,11 +421,9 @@ class RavenPainter extends CustomPainter {
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3);
     canvas.drawCircle(Offset(eyeOffsetX - 6, -22), 5, glowPaint);
     canvas.drawCircle(Offset(eyeOffsetX + 6, -22), 5, glowPaint);
-
     canvas.restore();
   }
-  @override
-  bool shouldRepaint(RavenPainter oldDelegate) => true;
+  @override bool shouldRepaint(RavenPainter oldDelegate) => true;
 }
 
 class Navbar extends StatelessWidget {
@@ -416,78 +437,118 @@ class Navbar extends StatelessWidget {
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
     final isMobile = Responsive.isMobile(context);
+    final topPadding = MediaQuery.of(context).padding.top;
     
-    return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).scaffoldBackgroundColor.withAlpha(200),
-        border: Border(bottom: BorderSide(color: Theme.of(context).dividerColor.withAlpha(20))),
-      ),
-      child: Center(
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 1400),
-          padding: EdgeInsets.symmetric(horizontal: width * 0.05, vertical: 20),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Flexible(child: _buildLogo()),
-              if (!isMobile) ...[
-                const Spacer(),
-                Flexible(
-                  flex: 3,
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
+    return ClipRRect(
+      child: BackdropFilter(
+        filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          decoration: BoxDecoration(
+            color: Theme.of(context).scaffoldBackgroundColor.withAlpha(isMobile ? 180 : 150),
+            border: Border(bottom: BorderSide(color: Theme.of(context).dividerColor.withAlpha(15))),
+          ),
+          padding: EdgeInsets.only(top: isMobile ? topPadding : 0),
+          child: Center(
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 1400),
+              padding: EdgeInsets.symmetric(
+                horizontal: width * 0.05, 
+                vertical: isMobile ? 12 : 18
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Flexible(child: _buildLogo(isMobile)),
+                  if (!isMobile) ...[
+                    const Spacer(),
+                    Flexible(
+                      flex: 8,
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _buildNavItems(),
+                            const SizedBox(width: 25),
+                            _buildThemeToggle(context),
+                            const SizedBox(width: 15),
+                            _buildCVButton(context),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ] else ...[
+                    Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        _buildNavItems(),
-                        const SizedBox(width: 20),
-                        _buildThemeToggle(context),
-                        const SizedBox(width: 15),
-                        _buildCVButton(context),
+                        _buildThemeToggle(context, small: true),
+                        const SizedBox(width: 5),
+                        IconButton(
+                          icon: const Icon(Icons.menu_rounded, size: 28),
+                          onPressed: () => scaffoldKey.currentState?.openDrawer(),
+                          color: const Color(0xFFE50914),
+                        ),
                       ],
                     ),
-                  ),
-                ),
-              ] else ...[
-                const Spacer(),
-                _buildThemeToggle(context, small: true),
-                IconButton(
-                  icon: const Icon(Icons.menu_rounded),
-                  onPressed: () => scaffoldKey.currentState?.openDrawer(),
-                ),
-              ],
-            ],
+                  ],
+                ],
+              ),
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildLogo() {
+  Widget _buildLogo(bool isMobile) {
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
         onTap: () => onItemTap(keys['Home']!),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: const Color(0xFFE50914).withAlpha(30),
-                borderRadius: BorderRadius.circular(12),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Hero(
+                tag: 'navbar_logo',
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [const Color(0xFFE50914), const Color(0xFFE50914).withAlpha(180)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFE50914).withAlpha(40),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      )
+                    ],
+                  ),
+                  child: Image.asset(
+                    'assets/images/rev.jpg', 
+                    height: isMobile ? 22 : 28, 
+                    errorBuilder: (_, __, ___) => Icon(Icons.auto_awesome, color: Colors.white, size: isMobile ? 16 : 22)
+                  ),
+                ),
               ),
-              child: Image.asset('assets/images/rev.jpg', height: 32, errorBuilder: (_, __, ___) => const Icon(Icons.auto_awesome, color: Color(0xFFE50914), size: 24)),
-            ),
-            const SizedBox(width: 12),
-            const Flexible(
-              child: Text(
+              const SizedBox(width: 10),
+              Text(
                 'TECH RAVEN', 
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: 2),
-                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: isMobile ? 15 : 18, 
+                  fontWeight: FontWeight.w900, 
+                  letterSpacing: 1.5,
+                  color: const Color(0xFFE50914),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -506,9 +567,10 @@ class Navbar extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     if (small) {
       return IconButton(
-        icon: Icon(isDark ? Icons.dark_mode_rounded : Icons.light_mode_rounded),
-        onPressed: onThemeToggle,
+        icon: Icon(isDark ? Icons.dark_mode_rounded : Icons.light_mode_rounded), 
+        onPressed: onThemeToggle, 
         color: const Color(0xFFE50914),
+        iconSize: 22,
       );
     }
     return MouseRegion(
@@ -517,19 +579,19 @@ class Navbar extends StatelessWidget {
         onTap: onThemeToggle,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 300),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
-            color: const Color(0xFFE50914).withAlpha(15),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: const Color(0xFFE50914).withAlpha(40)),
+            color: const Color(0xFFE50914).withAlpha(15), 
+            borderRadius: BorderRadius.circular(20), 
+            border: Border.all(color: const Color(0xFFE50914).withAlpha(40))
           ),
           child: Row(
             children: [
-              Icon(isDark ? Icons.dark_mode_rounded : Icons.light_mode_rounded, size: 16, color: const Color(0xFFE50914)),
-              const SizedBox(width: 10),
+              Icon(isDark ? Icons.dark_mode_rounded : Icons.light_mode_rounded, size: 14, color: const Color(0xFFE50914)),
+              const SizedBox(width: 8),
               Text(
-                isDark ? "DARK" : "LIGHT",
-                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFE50914), letterSpacing: 1),
+                isDark ? 'DARK' : 'LIGHT', 
+                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFFE50914), letterSpacing: 1)
               ),
             ],
           ),
@@ -540,30 +602,29 @@ class Navbar extends StatelessWidget {
 
   Widget _buildCVButton(BuildContext context) {
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        OutlinedButton(
+        TextButton(
           onPressed: () => _showAuthDialog(context),
-          style: OutlinedButton.styleFrom(
+          style: TextButton.styleFrom(
             foregroundColor: const Color(0xFFE50914),
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-            side: const BorderSide(color: Color(0xFFE50914)),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 15),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
-          child: const Text('Receipts', style: TextStyle(fontWeight: FontWeight.bold)),
+          child: const Text('Receipts', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: 8),
         ElevatedButton(
-          onPressed: () {
-            Navigator.of(context).push(MaterialPageRoute(builder: (context) => const ResumePage()));
-          },
+          onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => const ResumePage())),
           style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFFE50914),
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
-            elevation: 0,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            backgroundColor: const Color(0xFFE50914), 
+            foregroundColor: Colors.white, 
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18), 
+            elevation: 4,
+            shadowColor: const Color(0xFFE50914).withAlpha(100),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))
           ),
-          child: const Text('Resume', style: TextStyle(fontWeight: FontWeight.bold)),
+          child: const Text('Resume', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
         ),
       ],
     );
@@ -575,30 +636,28 @@ class Navbar extends StatelessWidget {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: Theme.of(context).colorScheme.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text('Access Restricted', style: TextStyle(fontWeight: FontWeight.bold)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Please enter the administrative ID to access the Receipt Generator.'),
+            const Text('Please enter the administrative ID to access the Receipt Generator.', style: TextStyle(fontSize: 14)),
             const SizedBox(height: 20),
             TextField(
-              controller: controller,
-              obscureText: true,
+              controller: controller, 
+              obscureText: true, 
               decoration: InputDecoration(
-                hintText: 'Admin ID',
-                filled: true,
-                fillColor: Theme.of(context).dividerColor.withAlpha(10),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-              ),
+                hintText: 'Admin ID', 
+                filled: true, 
+                fillColor: Theme.of(context).dividerColor.withAlpha(10), 
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none)
+              )
             ),
           ],
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Cancel', style: TextStyle(color: Theme.of(context).hintColor)),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context), child: Text('Cancel', style: TextStyle(color: Theme.of(context).hintColor))),
           ElevatedButton(
             onPressed: () {
               if (controller.text == 'kkrasta') {
@@ -606,16 +665,10 @@ class Navbar extends StatelessWidget {
                 Navigator.of(context).push(MaterialPageRoute(builder: (context) => const ReceiptPage()));
               } else {
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Invalid ID. Access Denied.')),
-                );
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invalid ID. Access Denied.')));
               }
             },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFE50914),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE50914), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
             child: const Text('Access'),
           ),
         ],
@@ -628,11 +681,11 @@ class Navbar extends StatelessWidget {
         child: GestureDetector(
           onTap: () => onItemTap(key),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
+            padding: const EdgeInsets.symmetric(horizontal: 18), 
             child: Text(
-              title,
-              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
-            ),
+              title, 
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)
+            )
           ),
         ),
       );
@@ -645,34 +698,81 @@ class AppDrawer extends StatelessWidget {
   const AppDrawer({super.key, required this.onItemTap, required this.keys, required this.onThemeToggle});
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Drawer(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       child: Column(
         children: [
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE50914).withAlpha(10),
+              border: Border(bottom: BorderSide(color: Theme.of(context).dividerColor.withAlpha(10))),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE50914),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.auto_awesome, color: Colors.white, size: 24),
+                ),
+                const SizedBox(width: 15),
+                const Text(
+                  'TECH RAVEN', 
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, letterSpacing: 2, color: Color(0xFFE50914))
+                ),
+              ],
+            ),
+          ),
           Expanded(
             child: ListView(
+              padding: const EdgeInsets.symmetric(vertical: 10),
               children: [
-                const DrawerHeader(child: Center(child: Text('TECH RAVEN', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xFFE50914), letterSpacing: 3)))),
-                ...keys.entries.map((e) => ListTile(title: Text(e.key), onTap: () => onItemTap(e.value))),
-                const Divider(),
-                ListTile(
-                  leading: const Icon(Icons.receipt_long, color: Color(0xFFE50914)),
-                  title: const Text('Generate Receipt'),
-                  onTap: () {
+                ...keys.entries.map((e) => _drawerItem(context, e.key, e.value, Icons.arrow_forward_ios_rounded)),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  child: Divider(),
+                ),
+                _drawerActionItem(
+                  context, 
+                  'Professional Resume', 
+                  Icons.description_rounded,
+                  () {
+                    Navigator.pop(context);
+                    Navigator.of(context).push(MaterialPageRoute(builder: (context) => const ResumePage()));
+                  }
+                ),
+                _drawerActionItem(
+                  context, 
+                  'Generate Receipt', 
+                  Icons.receipt_long_rounded,
+                  () {
                     Navigator.pop(context);
                     _showAuthDialog(context);
-                  },
+                  }
                 ),
               ],
             ),
           ),
           Padding(
             padding: const EdgeInsets.all(20),
-            child: ListTile(
-              leading: Icon(Theme.of(context).brightness == Brightness.dark ? Icons.dark_mode : Icons.light_mode),
-              title: Text(Theme.of(context).brightness == Brightness.dark ? "Dark Mode" : "Light Mode"),
-              trailing: Switch(
-                value: Theme.of(context).brightness == Brightness.dark,
-                onChanged: (_) => onThemeToggle(),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Theme.of(context).dividerColor.withAlpha(5),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: ListTile(
+                leading: Icon(isDark ? Icons.dark_mode_rounded : Icons.light_mode_rounded, color: const Color(0xFFE50914)),
+                title: Text(isDark ? "Dark Mode" : "Light Mode", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                trailing: Switch(
+                  value: isDark, 
+                  onChanged: (_) => onThemeToggle(),
+                  activeTrackColor: const Color(0xFFE50914),
+                ),
               ),
             ),
           ),
@@ -681,36 +781,48 @@ class AppDrawer extends StatelessWidget {
     );
   }
 
+  Widget _drawerItem(BuildContext context, String title, GlobalKey key, IconData icon) => ListTile(
+    contentPadding: const EdgeInsets.symmetric(horizontal: 25, vertical: 5),
+    title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+    trailing: Icon(Icons.chevron_right_rounded, size: 18, color: Theme.of(context).dividerColor.withAlpha(50)),
+    onTap: () => onItemTap(key),
+  );
+
+  Widget _drawerActionItem(BuildContext context, String title, IconData icon, VoidCallback onTap) => ListTile(
+    contentPadding: const EdgeInsets.symmetric(horizontal: 25, vertical: 5),
+    leading: Icon(icon, color: const Color(0xFFE50914), size: 22),
+    title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFFE50914))),
+    onTap: onTap,
+  );
+
   void _showAuthDialog(BuildContext context) {
     final controller = TextEditingController();
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: Theme.of(context).colorScheme.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text('Access Restricted', style: TextStyle(fontWeight: FontWeight.bold)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Please enter the administrative ID to access the Receipt Generator.'),
+            const Text('Please enter the administrative ID to access the Receipt Generator.', style: TextStyle(fontSize: 14)),
             const SizedBox(height: 20),
             TextField(
-              controller: controller,
-              obscureText: true,
+              controller: controller, 
+              obscureText: true, 
               decoration: InputDecoration(
-                hintText: 'Admin ID',
-                filled: true,
-                fillColor: Theme.of(context).dividerColor.withAlpha(10),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-              ),
+                hintText: 'Admin ID', 
+                filled: true, 
+                fillColor: Theme.of(context).dividerColor.withAlpha(10), 
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none)
+              )
             ),
           ],
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Cancel', style: TextStyle(color: Theme.of(context).hintColor)),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context), child: Text('Cancel', style: TextStyle(color: Theme.of(context).hintColor))),
           ElevatedButton(
             onPressed: () {
               if (controller.text == 'kkrasta') {
@@ -718,16 +830,10 @@ class AppDrawer extends StatelessWidget {
                 Navigator.of(context).push(MaterialPageRoute(builder: (context) => const ReceiptPage()));
               } else {
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Invalid ID. Access Denied.')),
-                );
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invalid ID. Access Denied.')));
               }
             },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFE50914),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE50914), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
             child: const Text('Access'),
           ),
         ],
@@ -748,26 +854,25 @@ class HeroSection extends StatelessWidget {
     
     return Container(
       constraints: const BoxConstraints(maxWidth: 1400),
-      padding: EdgeInsets.symmetric(
-        horizontal: width * 0.08, 
-        vertical: isMobile ? 80 : (isTablet ? 100 : 150)
-      ),
-      child: Responsive(
-        mobile: Column(
-          children: [
-            _buildImage(context, isMobile),
-            const SizedBox(height: 60),
-            _buildText(context, isMobile, isTablet),
-          ],
-        ),
-        desktop: Row(
+      padding: EdgeInsets.symmetric(horizontal: width * 0.08, vertical: isMobile ? 80 : (isTablet ? 100 : 150)),
+      child: LayoutBuilder(builder: (context, constraints) {
+        if (isMobile) {
+          return Column(
+            children: [
+              _buildImage(context, isMobile),
+              const SizedBox(height: 60),
+              _buildText(context, isMobile, isTablet),
+            ],
+          );
+        }
+        return Row(
           children: [
             Expanded(flex: 3, child: _buildText(context, isMobile, isTablet)),
             const SizedBox(width: 50),
             Expanded(flex: 2, child: _buildImage(context, isMobile)),
           ],
-        ),
-      ),
+        );
+      }),
     );
   }
 
@@ -776,87 +881,36 @@ class HeroSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: isMobile ? CrossAxisAlignment.center : CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: const Color(0xFFE50914).withAlpha(20),
-              borderRadius: BorderRadius.circular(30),
-              border: Border.all(color: const Color(0xFFE50914).withAlpha(40)),
-            ),
-            child: const Text('👋 Hello, I\'m', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFFE50914))),
-          ),
+          Container(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), decoration: BoxDecoration(color: const Color(0xFFE50914).withAlpha(20), borderRadius: BorderRadius.circular(30), border: Border.all(color: const Color(0xFFE50914).withAlpha(40))), child: const Text('👋 Hello, I\'m', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFFE50914)))),
           const SizedBox(height: 24),
           Text.rich(
             textAlign: isMobile ? TextAlign.center : TextAlign.start,
             TextSpan(
               text: 'Kyeremeh ',
-              style: TextStyle(
-                fontSize: isMobile ? 42 : (isTablet ? 60 : 80),
-                fontWeight: FontWeight.w900,
-                letterSpacing: -2,
-                height: 1.1,
-              ),
-              children: const [
-                TextSpan(
-                  text: 'Clifford',
-                  style: TextStyle(
-                    color: Color(0xFFE50914),
-                    shadows: [Shadow(color: Color(0xFFE50914), blurRadius: 40)],
-                  ),
-                ),
-              ],
+              style: TextStyle(fontSize: isMobile ? 42 : (isTablet ? 60 : 80), fontWeight: FontWeight.w900, letterSpacing: -2, height: 1.1),
+              children: const [TextSpan(text: 'Clifford', style: TextStyle(color: Color(0xFFE50914), shadows: [Shadow(color: Color(0xFFE50914), blurRadius: 40)]))],
             ),
           ),
           const SizedBox(height: 20),
-          Text(
-            'Founder & CEO of Tech Raven | Full Stack Architect',
-            textAlign: isMobile ? TextAlign.center : TextAlign.start,
-            style: TextStyle(
-              fontSize: isMobile ? 18 : 22,
-              fontWeight: FontWeight.w500,
-              color: Theme.of(context).textTheme.bodyLarge?.color?.withAlpha(200),
-            ),
-          ),
+          Text('Founder & CEO of Tech Raven | Full Stack Architect', textAlign: isMobile ? TextAlign.center : TextAlign.start, style: TextStyle(fontSize: isMobile ? 18 : 22, fontWeight: FontWeight.w500, color: Theme.of(context).textTheme.bodyLarge?.color?.withAlpha(200))),
           const SizedBox(height: 30),
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 600),
-            child: Text(
-              'Founder and CEO of Tech Raven, leading the vision for high-performance digital ecosystems. I specialize in architecting elite applications that transform visionary ideas into industry-leading solutions.',
-              textAlign: isMobile ? TextAlign.center : TextAlign.start,
-              style: TextStyle(
-                fontSize: isMobile ? 16 : 18,
-                color: Theme.of(context).textTheme.bodyMedium?.color?.withAlpha(200),
-                height: 1.7,
-              ),
-            ),
-          ),
+          ConstrainedBox(constraints: const BoxConstraints(maxWidth: 600), child: Text('Founder and CEO of Tech Raven, leading the vision for high-performance digital ecosystems. I specialize in architecting elite applications that transform visionary ideas into industry-leading solutions.', textAlign: isMobile ? TextAlign.center : TextAlign.start, style: TextStyle(fontSize: isMobile ? 16 : 18, color: Theme.of(context).textTheme.bodyMedium?.color?.withAlpha(200), height: 1.7))),
           const SizedBox(height: 48),
           Wrap(
             alignment: WrapAlignment.center,
             spacing: 20,
             runSpacing: 20,
             children: [
-              _ActionButton(
-                label: 'View My Projects',
-                onPressed: onViewProjects,
-                isPrimary: true,
-              ),
-              _ActionButton(
-                label: 'Contact Me',
-                onPressed: () async {
+              _ActionButton(label: 'View My Projects', onPressed: onViewProjects, isPrimary: true),
+              _ActionButton(label: 'Contact Me', onPressed: () async {
                   final uri = Uri.parse('https://wa.me/233559650921');
-                  if (await canLaunchUrl(uri)) {
-                    await launchUrl(uri);
-                  }
-                },
-                isPrimary: false,
-                icon: Icons.chat_bubble_outline,
-              ),
+                  if (await canLaunchUrl(uri)) await launchUrl(uri);
+              }, isPrimary: false, icon: Icons.chat_bubble_outline),
             ],
           ),
           const SizedBox(height: 48),
           Wrap(
-            alignment: WrapAlignment.center,
+            alignment: isMobile ? WrapAlignment.center : WrapAlignment.start,
             spacing: 15,
             runSpacing: 15,
             children: const [
@@ -873,8 +927,7 @@ class HeroSection extends StatelessWidget {
 
   Widget _buildImage(BuildContext context, bool isMobile) {
     final size = MediaQuery.of(context).size;
-    final imageSize = isMobile ? size.width * 0.7 : math.min(size.width * 0.3, 420.0);
-    
+    final imageSize = isMobile ? math.min(size.width * 0.7, 300.0) : math.min(size.width * 0.3, 420.0);
     return FadeInAnimation(
       delay: 300,
       child: Center(
@@ -883,34 +936,8 @@ class HeroSection extends StatelessWidget {
           children: [
             _glowCircle(imageSize * 1.3, 0.1),
             _glowCircle(imageSize * 1.15, 0.05),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: const Color(0xFFE50914).withAlpha(30), width: 2),
-              ),
-              child: Container(
-                key: profilePicKey,
-                width: imageSize,
-                height: imageSize,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: const Color(0xFFE50914), width: 6),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFFE50914).withAlpha(80),
-                      blurRadius: 40,
-                      spreadRadius: 5,
-                    ),
-                  ],
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: Image.asset(
-                  'assets/images/pic.jpg',
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => const Icon(Icons.person, size: 100, color: Colors.white10),
-                ),
-              ),
+            Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: const Color(0xFFE50914).withAlpha(30), width: 2)),
+              child: Container(key: profilePicKey, width: imageSize, height: imageSize, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: const Color(0xFFE50914), width: 6), boxShadow: [BoxShadow(color: const Color(0xFFE50914).withAlpha(80), blurRadius: 40, spreadRadius: 5)]), clipBehavior: Clip.antiAlias, child: Image.asset('assets/images/pic.jpg', fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.person, size: 100, color: Colors.white10))),
             ),
           ],
         ),
@@ -918,19 +945,7 @@ class HeroSection extends StatelessWidget {
     );
   }
 
-  Widget _glowCircle(double s, double o) => Container(
-        width: s,
-        height: s,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: RadialGradient(
-            colors: [
-              const Color(0xFFE50914).withValues(alpha: o),
-              Colors.transparent,
-            ],
-          ),
-        ),
-      );
+  Widget _glowCircle(double s, double o) => Container(width: s, height: s, decoration: BoxDecoration(shape: BoxShape.circle, gradient: RadialGradient(colors: [const Color(0xFFE50914).withValues(alpha: o), Colors.transparent])));
 }
 
 class _ActionButton extends StatefulWidget {
@@ -938,63 +953,27 @@ class _ActionButton extends StatefulWidget {
   final VoidCallback onPressed;
   final bool isPrimary;
   final IconData? icon;
-
-  const _ActionButton({
-    required this.label,
-    required this.onPressed,
-    required this.isPrimary,
-    this.icon,
-  });
-
-  @override
-  State<_ActionButton> createState() => _ActionButtonState();
+  const _ActionButton({required this.label, required this.onPressed, required this.isPrimary, this.icon});
+  @override State<_ActionButton> createState() => _ActionButtonState();
 }
 
 class _ActionButtonState extends State<_ActionButton> {
   bool _isHovered = false;
-
-  @override
-  Widget build(BuildContext context) {
+  @override Widget build(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),
       onExit: (_) => setState(() => _isHovered = false),
       child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: widget.isPrimary
-              ? [
-                  BoxShadow(
-                    color: const Color(0xFFE50914).withAlpha(60),
-                    blurRadius: 20,
-                    offset: const Offset(0, 10),
-                  )
-                ]
-              : null,
-        ),
+        decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), boxShadow: widget.isPrimary ? [BoxShadow(color: const Color(0xFFE50914).withAlpha(60), blurRadius: 20, offset: const Offset(0, 10))] : null),
         child: ElevatedButton(
           onPressed: widget.onPressed,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: widget.isPrimary ? const Color(0xFFE50914) : Colors.transparent,
-            foregroundColor: widget.isPrimary ? Colors.white : Theme.of(context).colorScheme.primary,
-            padding: EdgeInsets.symmetric(horizontal: MediaQuery.of(context).size.width < 600 ? 20 : 40, vertical: 24),
-            elevation: 0,
-            side: widget.isPrimary ? null : BorderSide(color: Theme.of(context).colorScheme.primary.withAlpha(100)),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
+          style: ElevatedButton.styleFrom(backgroundColor: widget.isPrimary ? const Color(0xFFE50914) : Colors.transparent, foregroundColor: widget.isPrimary ? Colors.white : Theme.of(context).colorScheme.primary, padding: EdgeInsets.symmetric(horizontal: width < 600 ? 24 : 40, vertical: 24), elevation: 0, side: widget.isPrimary ? null : BorderSide(color: Theme.of(context).colorScheme.primary.withAlpha(100)), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (widget.icon != null && _isHovered) ...[
-                Icon(widget.icon, size: 20),
-                const SizedBox(width: 10),
-              ],
-              Flexible(
-                child: Text(
-                  widget.label,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
+              if (widget.icon != null && _isHovered) ...[Icon(widget.icon, size: 20), const SizedBox(width: 10)],
+              Flexible(child: Text(widget.label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16), overflow: TextOverflow.ellipsis)),
             ],
           ),
         ),
@@ -1024,192 +1003,35 @@ class AboutAndSkillsSection extends StatelessWidget {
             const SizedBox(height: 30),
             _buildHighlights(context),
           ] else if (isTablet) ...[
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(flex: 1, child: _buildAbout(context)),
-                const SizedBox(width: 30),
-                Expanded(flex: 1, child: _buildSkills(context)),
-              ],
-            ),
+            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Expanded(flex: 1, child: _buildAbout(context)), const SizedBox(width: 30), Expanded(flex: 1, child: _buildSkills(context))]),
             const SizedBox(height: 30),
             _buildHighlights(context),
           ] else ...[
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(flex: 2, child: _buildAbout(context)),
-                const SizedBox(width: 30),
-                Expanded(flex: 2, child: _buildSkills(context)),
-                const SizedBox(width: 30),
-                Expanded(flex: 1, child: _buildHighlights(context)),
-              ],
-            ),
+            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Expanded(flex: 2, child: _buildAbout(context)), const SizedBox(width: 30), Expanded(flex: 2, child: _buildSkills(context)), const SizedBox(width: 30), Expanded(flex: 1, child: _buildHighlights(context))]),
           ],
         ],
       ),
     );
-  }  Widget _buildAbout(BuildContext context) {
-    return _card(
-      context: context,
-      key: aboutKey,
-      icon: Icons.person_outline,
-      title: 'About Me',
-      content: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'As the Founder and CEO of Tech Raven, I lead the technical vision and strategy for high-impact mobile and web applications. I am dedicated to building products that not only function flawlessly but also redefine industry benchmarks.',
-            style: TextStyle(
-              fontSize: 16,
-              height: 1.8,
-              color: Theme.of(context).textTheme.bodyMedium?.color?.withAlpha(180),
-            ),
-          ),
-          const SizedBox(height: 30),
-          TextButton(
-            onPressed: () {},
-            style: TextButton.styleFrom(
-              padding: EdgeInsets.zero,
-              foregroundColor: const Color(0xFFE50914),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: const [
-                Text('Read More', style: TextStyle(fontWeight: FontWeight.bold)),
-                SizedBox(width: 8),
-                Icon(Icons.arrow_forward_rounded, size: 16),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
+  }
+
+  Widget _buildAbout(BuildContext context) {
+    return _card(context: context, key: aboutKey, icon: Icons.person_outline, title: 'About Me', content: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('As the Founder and CEO of Tech Raven, I lead the technical vision and strategy for high-impact mobile and web applications. I am dedicated to building products that not only function flawlessly but also redefine industry benchmarks.', style: TextStyle(fontSize: 16, height: 1.8, color: Theme.of(context).textTheme.bodyMedium?.color?.withAlpha(180))), const SizedBox(height: 30), TextButton(onPressed: () {}, style: TextButton.styleFrom(padding: EdgeInsets.zero, foregroundColor: const Color(0xFFE50914)), child: Row(mainAxisSize: MainAxisSize.min, children: const [Text('Read More', style: TextStyle(fontWeight: FontWeight.bold)), SizedBox(width: 8), Icon(Icons.arrow_forward_rounded, size: 16)]))]));
   }
 
   Widget _buildSkills(BuildContext context) {
-    return _card(
-      context: context,
-      key: skillsKey,
-      icon: Icons.code,
-      title: 'Top Skills',
-      content: Column(
-        children: [
-          _sBar('Flutter & Dart', 1.0),
-          _sBar('Backend (Supabase/Firebase)', 0.95),
-          _sBar('Full Stack Architecture', 0.98),
-          _sBar('UI/UX Design', 0.92),
-          _sBar('Cloud Infrastructure', 0.85),
-        ],
-      ),
-    );
+    return _card(context: context, key: skillsKey, icon: Icons.code, title: 'Top Skills', content: Column(children: [_sBar('Flutter & Dart', 1.0), _sBar('Backend (Supabase/Firebase)', 0.95), _sBar('Full Stack Architecture', 0.98), _sBar('UI/UX Design', 0.92), _sBar('Cloud Infrastructure', 0.85)]));
   }
 
   Widget _buildHighlights(BuildContext context) {
-    return _card(
-      context: context,
-      icon: Icons.star_outline,
-      title: 'Highlights',
-      content: SizedBox(
-        width: double.infinity,
-        child: Wrap(
-          runSpacing: 25,
-          spacing: 25,
-          alignment: WrapAlignment.center,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: const [
-            _StatItem(v: '5+', l: 'Years Exp'),
-            _StatItem(v: '100+', l: 'Projects'),
-            _StatItem(v: '50+', l: 'Clients'),
-          ],
-        ),
-      ),
-    );
+    return _card(context: context, icon: Icons.star_outline, title: 'Highlights', content: SizedBox(width: double.infinity, child: Wrap(runSpacing: 25, spacing: 25, alignment: WrapAlignment.center, crossAxisAlignment: WrapCrossAlignment.center, children: const [_StatItem(v: '5+', l: 'Years Exp'), _StatItem(v: '100+', l: 'Projects'), _StatItem(v: '50+', l: 'Clients')])));
   }
 
   Widget _card({required BuildContext context, Key? key, required IconData icon, required String title, required Widget content}) {
     final isSmall = MediaQuery.of(context).size.width < 1200;
-    return Container(
-        key: key,
-        padding: EdgeInsets.all(isSmall ? 24 : 40),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: BorderRadius.circular(32),
-          border: Border.all(color: Theme.of(context).dividerColor.withAlpha(15)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withAlpha(10),
-              blurRadius: 30,
-              offset: const Offset(0, 15),
-            )
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE50914).withAlpha(20),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(icon, color: const Color(0xFFE50914), size: 24),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Text(
-                    title,
-                    style: TextStyle(
-                      fontSize: 22, 
-                      fontWeight: FontWeight.bold, 
-                      letterSpacing: -0.5,
-                      color: Theme.of(context).textTheme.titleLarge?.color,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 32),
-            content,
-          ],
-        ),
-      );
+    return Container(key: key, padding: EdgeInsets.all(isSmall ? 24 : 40), decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: BorderRadius.circular(32), border: Border.all(color: Theme.of(context).dividerColor.withAlpha(15)), boxShadow: [BoxShadow(color: Colors.black.withAlpha(10), blurRadius: 30, offset: const Offset(0, 15))]), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Row(children: [Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: const Color(0xFFE50914).withAlpha(20), borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: const Color(0xFFE50914), size: 24)), const SizedBox(width: 16), Expanded(child: Text(title, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: -0.5), overflow: TextOverflow.ellipsis))]), const SizedBox(height: 32), content]));
   }
 
-  Widget _sBar(String s, double l) => Padding(
-        padding: const EdgeInsets.only(bottom: 20),
-        child: Column(
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(
-                    s, 
-                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Text('${(l * 100).toInt()}%', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFFE50914))),
-              ],
-            ),
-            const SizedBox(height: 12),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: LinearProgressIndicator(
-                value: l,
-                backgroundColor: const Color(0xFFE50914).withAlpha(40),
-                valueColor: const AlwaysStoppedAnimation(Color(0xFFE50914)),
-                minHeight: 8,
-              ),
-            ),
-          ],
-        ),
-      );
+  Widget _sBar(String s, double l) => Padding(padding: const EdgeInsets.only(bottom: 20), child: Column(children: [Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Expanded(child: Text(s, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500), overflow: TextOverflow.ellipsis)), const SizedBox(width: 10), Text('${(l * 100).toInt()}%', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFFE50914)))]), const SizedBox(height: 12), ClipRRect(borderRadius: BorderRadius.circular(10), child: LinearProgressIndicator(value: l, backgroundColor: const Color(0xFFE50914).withAlpha(40), valueColor: const AlwaysStoppedAnimation(Color(0xFFE50914)), minHeight: 8))]));
 }
 
 class ProjectsSection extends StatelessWidget {
@@ -1230,55 +1052,24 @@ class ProjectsSection extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('PORTFOLIO', style: TextStyle(color: Color(0xFFE50914), fontWeight: FontWeight.bold, letterSpacing: 2, fontSize: 14)),
-                    const SizedBox(height: 8),
-                    Text('Featured Projects', style: TextStyle(fontSize: isMobile ? 32 : (isTablet ? 40 : 48), fontWeight: FontWeight.w900, letterSpacing: -1)),
-                  ],
-                ),
-              ),
-              if (!isMobile)
-                TextButton(
-                  onPressed: () {},
-                  child: Row(
-                    children: [
-                      Text('View All Projects', style: TextStyle(color: Theme.of(context).hintColor, fontWeight: FontWeight.bold)),
-                      const SizedBox(width: 8),
-                      Icon(Icons.arrow_right_alt, color: Theme.of(context).hintColor),
-                    ],
-                  ),
-                ),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const Text('PORTFOLIO', style: TextStyle(color: Color(0xFFE50914), fontWeight: FontWeight.bold, letterSpacing: 2, fontSize: 14)), const SizedBox(height: 8), Text('Featured Projects', style: TextStyle(fontSize: isMobile ? 32 : (isTablet ? 40 : 48), fontWeight: FontWeight.w900, letterSpacing: -1))])),
+              if (!isMobile) TextButton(onPressed: () {}, child: Row(children: [Text('View All Projects', style: TextStyle(color: Theme.of(context).hintColor, fontWeight: FontWeight.bold)), const SizedBox(width: 8), Icon(Icons.arrow_right_alt, color: Theme.of(context).hintColor)])),
             ],
           ),
           const SizedBox(height: 60),
-          GridView.builder(
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: width > 1200 ? 3 : (width > 700 ? 2 : 1),
-              crossAxisSpacing: 30,
-              mainAxisSpacing: 30,
-              childAspectRatio: isMobile ? 0.95 : (isTablet ? 1.1 : 1.25),
-            ),
-            itemCount: 5,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemBuilder: (context, index) {
-              final p = [
-                {'t': 'Meat Shop POS', 'g': ['Flutter', 'MySQL', 'Node.js'], 'i': Icons.shopping_cart},
-                {'t': 'Pet Care App', 'g': ['Flutter', 'Firebase', 'Cloud Functions'], 'i': Icons.pets},
-                {'t': 'News Portal', 'g': ['PHP', 'MySQL', 'Rest API'], 'i': Icons.article},
-                {'t': 'Attendance System', 'g': ['Flutter', 'SQLite', 'Biometrics'], 'i': Icons.fingerprint},
-                {'t': 'Analytics Dashboard', 'g': ['Flutter', 'Charts', 'Supabase'], 'i': Icons.dashboard},
-              ];
-              return _PCard(
-                title: p[index]['t'] as String,
-                tags: p[index]['g'] as List<String>,
-                icon: p[index]['i'] as IconData,
-              );
-            },
-          ),
+          LayoutBuilder(builder: (context, constraints) {
+            int columns = width > 1200 ? 3 : (width > 750 ? 2 : 1);
+            return GridView.builder(
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: columns, crossAxisSpacing: 30, mainAxisSpacing: 30, childAspectRatio: isMobile ? 0.9 : 1.2),
+              itemCount: 5,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemBuilder: (context, index) {
+                final p = [{'t': 'Meat Shop POS', 'g': ['Flutter', 'MySQL', 'Node.js'], 'i': Icons.shopping_cart}, {'t': 'Pet Care App', 'g': ['Flutter', 'Firebase', 'Cloud Functions'], 'i': Icons.pets}, {'t': 'News Portal', 'g': ['PHP', 'MySQL', 'Rest API'], 'i': Icons.article}, {'t': 'Attendance System', 'g': ['Flutter', 'SQLite', 'Biometrics'], 'i': Icons.fingerprint}, {'t': 'Analytics Dashboard', 'g': ['Flutter', 'Charts', 'Supabase'], 'i': Icons.dashboard}];
+                return _PCard(title: p[index]['t'] as String, tags: p[index]['g'] as List<String>, icon: p[index]['i'] as IconData);
+              },
+            );
+          }),
         ],
       ),
     );
@@ -1303,52 +1094,15 @@ class _PCardState extends State<_PCard> {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
         transform: h ? (Matrix4.identity()..setTranslationRaw(0.0, -10.0, 0.0)) : Matrix4.identity(),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: h ? const Color(0xFFE50914).withAlpha(100) : Theme.of(context).dividerColor.withAlpha(15)),
-          boxShadow: h ? [BoxShadow(color: const Color(0xFFE50914).withAlpha(40), blurRadius: 40, offset: const Offset(0, 20))] : [],
-        ),
+        decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: BorderRadius.circular(24), border: Border.all(color: h ? const Color(0xFFE50914).withAlpha(100) : Theme.of(context).dividerColor.withAlpha(15)), boxShadow: h ? [BoxShadow(color: const Color(0xFFE50914).withAlpha(40), blurRadius: 40, offset: const Offset(0, 20))] : []),
         clipBehavior: Clip.antiAlias,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
-              child: Container(
-                width: double.infinity,
-                color: Theme.of(context).dividerColor.withAlpha(10),
-                child: Icon(widget.icon, color: h ? const Color(0xFFE50914) : Theme.of(context).dividerColor.withAlpha(20), size: 80),
-              ),
-            ),
+            Expanded(child: Container(width: double.infinity, color: Theme.of(context).dividerColor.withAlpha(10), child: Icon(widget.icon, color: h ? const Color(0xFFE50914) : Theme.of(context).dividerColor.withAlpha(20), size: 80))),
             Padding(
               padding: EdgeInsets.all(isMobile ? 24 : 32),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    widget.title, 
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: widget.tags.map((t) => Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE50914).withAlpha(15),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        t, 
-                        style: const TextStyle(fontSize: 11, color: Color(0xFFE50914), fontWeight: FontWeight.w600),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    )).toList(),
-                  ),
-                ],
-              ),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(widget.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20), overflow: TextOverflow.ellipsis), const SizedBox(height: 12), Wrap(spacing: 8, runSpacing: 8, children: widget.tags.map((t) => Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), decoration: BoxDecoration(color: const Color(0xFFE50914).withAlpha(15), borderRadius: BorderRadius.circular(6)), child: Text(t, style: const TextStyle(fontSize: 11, color: Color(0xFFE50914), fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis))).toList())]),
             ),
           ],
         ),
@@ -1375,27 +1129,25 @@ class ServicesSection extends StatelessWidget {
           const SizedBox(height: 8),
           Text('What I Offer', style: TextStyle(fontSize: isMobile ? 32 : (isTablet ? 40 : 48), fontWeight: FontWeight.w900, letterSpacing: -1)),
           const SizedBox(height: 60),
-          GridView.count(
-            crossAxisCount: width > 1200 ? 3 : (width > 700 ? 2 : 1),
-            shrinkWrap: true,
-            crossAxisSpacing: 30,
-            mainAxisSpacing: 30,
-            childAspectRatio: isMobile ? 1.1 : 1.5,
-            physics: const NeverScrollableScrollPhysics(),
-            children: const [
-              _SCard(i: Icons.smartphone, t: 'App Development', d: 'High-performance native and cross-platform mobile apps.'),
-              _SCard(i: Icons.auto_awesome, t: 'UI/UX Design', d: 'Modern, clean, and intuitive user interface designs.'),
-              _SCard(i: Icons.cloud, t: 'Cloud Solutions', d: 'Scalable backend architectures using Supabase & Firebase.'),
-              _SCard(i: Icons.code, t: 'Web Development', d: 'Responsive and SEO-optimized web applications.'),
-              _SCard(i: Icons.security, t: 'Security Audit', d: 'Ensuring your digital products are safe and reliable.'),
-              _SCard(i: Icons.rocket, t: 'MVP Development', d: 'Turning your startup ideas into working prototypes fast.'),
-            ],
-          ),
+          LayoutBuilder(builder: (context, constraints) {
+            int columns = width > 1200 ? 3 : (width > 700 ? 2 : 1);
+            return GridView.count(
+              crossAxisCount: columns,
+              shrinkWrap: true,
+              crossAxisSpacing: 30,
+              mainAxisSpacing: 30,
+              childAspectRatio: isMobile ? 1.2 : 1.5,
+              physics: const NeverScrollableScrollPhysics(),
+              children: const [_SCard(i: Icons.smartphone, t: 'App Development', d: 'High-performance native and cross-platform mobile apps.'), _SCard(i: Icons.auto_awesome, t: 'UI/UX Design', d: 'Modern, clean, and intuitive user interface designs.'), _SCard(i: Icons.cloud, t: 'Cloud Solutions', d: 'Scalable backend architectures using Supabase & Firebase.'), _SCard(i: Icons.code, t: 'Web Development', d: 'Responsive and SEO-optimized web applications.'), _SCard(i: Icons.security, t: 'Security Audit', d: 'Ensuring your digital products are safe and reliable.'), _SCard(i: Icons.rocket, t: 'MVP Development', d: 'Turning your startup ideas into working prototypes fast.')],
+            );
+          }),
         ],
       ),
     );
   }
-}class _SCard extends StatelessWidget {
+}
+
+class _SCard extends StatelessWidget {
   final IconData i;
   final String t, d;
   const _SCard({required this.i, required this.t, required this.d});
@@ -1404,36 +1156,16 @@ class ServicesSection extends StatelessWidget {
     final isMobile = MediaQuery.of(context).size.width < 600;
     return Container(
       padding: EdgeInsets.all(isMobile ? 24 : 32),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Theme.of(context).dividerColor.withAlpha(15)),
-      ),
+      decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: BorderRadius.circular(24), border: Border.all(color: Theme.of(context).dividerColor.withAlpha(15))),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFE50914).withAlpha(20),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(i, color: const Color(0xFFE50914), size: 28),
-          ),
+          Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: const Color(0xFFE50914).withAlpha(20), borderRadius: BorderRadius.circular(12)), child: Icon(i, color: const Color(0xFFE50914), size: 28)),
           const SizedBox(height: 24),
-          Text(
-            t, 
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-            overflow: TextOverflow.ellipsis,
-          ),
+          Text(t, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18), overflow: TextOverflow.ellipsis),
           const SizedBox(height: 12),
-          Text(
-            d, 
-            style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color?.withAlpha(200), height: 1.5),
-            maxLines: 3,
-            overflow: TextOverflow.ellipsis,
-          ),
+          Text(d, style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color?.withAlpha(200), height: 1.5), maxLines: 3, overflow: TextOverflow.ellipsis),
         ],
       ),
     );
@@ -1450,55 +1182,20 @@ class TechnologiesSection extends StatelessWidget {
       padding: EdgeInsets.symmetric(horizontal: width * 0.08, vertical: 60),
       child: Column(
         children: [
-          Text(
-            'TRUSTED BY TOOLS & TECHNOLOGIES',
-            style: TextStyle(
-              fontSize: 14,
-              letterSpacing: 3,
-              fontWeight: FontWeight.bold,
-              color: Theme.of(context).hintColor.withAlpha(150),
-            ),
-          ),
+          Text('TRUSTED BY TOOLS & TECHNOLOGIES', style: TextStyle(fontSize: 14, letterSpacing: 3, fontWeight: FontWeight.bold, color: Theme.of(context).hintColor.withAlpha(150))),
           const SizedBox(height: 60),
           Wrap(
             alignment: WrapAlignment.center,
             spacing: 40,
             runSpacing: 40,
-            children: [
-              _tech(Icons.flutter_dash, 'Flutter', context),
-              _tech(Icons.storage, 'Supabase', context),
-              _tech(Icons.fireplace, 'Firebase', context),
-              _tech(Icons.code, 'Dart', context),
-              _tech(Icons.terminal, 'Git/GitHub', context),
-              _tech(Icons.layers, 'Clean Arch', context),
-              _tech(Icons.web, 'Web Dev', context),
-              _tech(Icons.android, 'Android', context),
-            ],
+            children: [_tech(Icons.flutter_dash, 'Flutter', context), _tech(Icons.storage, 'Supabase', context), _tech(Icons.fireplace, 'Firebase', context), _tech(Icons.code, 'Dart', context), _tech(Icons.terminal, 'Git/GitHub', context), _tech(Icons.layers, 'Clean Arch', context), _tech(Icons.web, 'Web Dev', context), _tech(Icons.android, 'Android', context)],
           ),
         ],
       ),
     );
   }
 
-  Widget _tech(IconData i, String l, BuildContext context) => MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: Column(
-          children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surface,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Theme.of(context).dividerColor.withAlpha(10)),
-              ),
-              child: Icon(i, color: Theme.of(context).hintColor.withAlpha(200), size: 32),
-            ),
-            const SizedBox(height: 12),
-            Text(l, style: TextStyle(color: Theme.of(context).hintColor.withAlpha(200), fontSize: 12, fontWeight: FontWeight.w500)),
-          ],
-        ),
-      );
+  Widget _tech(IconData i, String l, BuildContext context) => Column(children: [Container(width: 80, height: 80, decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: BorderRadius.circular(20), border: Border.all(color: Theme.of(context).dividerColor.withAlpha(10))), child: Icon(i, color: Theme.of(context).hintColor.withAlpha(200), size: 32)), const SizedBox(height: 12), Text(l, style: TextStyle(color: Theme.of(context).hintColor.withAlpha(200), fontSize: 12, fontWeight: FontWeight.w500))]);
 }
 
 class ContactSection extends StatelessWidget {
@@ -1513,27 +1210,13 @@ class ContactSection extends StatelessWidget {
       padding: EdgeInsets.symmetric(horizontal: width * 0.08, vertical: isMobile ? 60 : 100),
       child: Container(
         padding: EdgeInsets.all(isMobile ? 30 : 80),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: BorderRadius.circular(isMobile ? 32 : 40),
-          border: Border.all(color: Theme.of(context).dividerColor.withAlpha(15)),
-        ),
-        child: Responsive(
-          mobile: Column(
-            children: [
-              _buildContactText(context, isMobile),
-              const SizedBox(height: 60),
-              _buildContactInfo(context),
-            ],
-          ),
-          desktop: Row(
-            children: [
-              Expanded(flex: 3, child: _buildContactText(context, isMobile)),
-              const SizedBox(width: 80),
-              Expanded(flex: 2, child: _buildContactInfo(context)),
-            ],
-          ),
-        ),
+        decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: BorderRadius.circular(isMobile ? 32 : 40), border: Border.all(color: Theme.of(context).dividerColor.withAlpha(15))),
+        child: LayoutBuilder(builder: (context, constraints) {
+          if (isMobile) {
+            return Column(children: [_buildContactText(context, isMobile), const SizedBox(height: 60), _buildContactInfo(context)]);
+          }
+          return Row(children: [Expanded(flex: 3, child: _buildContactText(context, isMobile)), const SizedBox(width: 80), Expanded(flex: 2, child: _buildContactInfo(context))]);
+        }),
       ),
     );
   }
@@ -1550,47 +1233,30 @@ class ContactSection extends StatelessWidget {
           children: [
             ListTile(
               contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-              leading: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: const Color(0xFFE50914).withAlpha(20), shape: BoxShape.circle),
-                child: const Icon(Icons.email_outlined, color: Color(0xFFE50914), size: 20),
-              ),
+              leading: Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: const Color(0xFFE50914).withAlpha(20), shape: BoxShape.circle), child: const Icon(Icons.email_outlined, color: Color(0xFFE50914), size: 20)),
               title: const Text('Email Me', style: TextStyle(fontWeight: FontWeight.bold)),
               subtitle: const Text('techraven11@gmail.com', style: TextStyle(fontSize: 12)),
               onTap: () async {
                 final uri = Uri.parse('mailto:techraven11@gmail.com');
-                if (await canLaunchUrl(uri)) {
-                  await launchUrl(uri);
-                }
+                if (await canLaunchUrl(uri)) await launchUrl(uri);
                 Navigator.pop(context);
               },
             ),
             const Divider(height: 1),
             ListTile(
               contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-              leading: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: const Color(0xFFE50914).withAlpha(20), shape: BoxShape.circle),
-                child: const Icon(Icons.chat_bubble_outline, color: Color(0xFFE50914), size: 20),
-              ),
+              leading: Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: const Color(0xFFE50914).withAlpha(20), shape: BoxShape.circle), child: const Icon(Icons.chat_bubble_outline, color: Color(0xFFE50914), size: 20)),
               title: const Text('WhatsApp', style: TextStyle(fontWeight: FontWeight.bold)),
               subtitle: const Text('0559650921', style: TextStyle(fontSize: 12)),
               onTap: () async {
                 final uri = Uri.parse('https://wa.me/233559650921');
-                if (await canLaunchUrl(uri)) {
-                  await launchUrl(uri);
-                }
+                if (await canLaunchUrl(uri)) await launchUrl(uri);
                 Navigator.pop(context);
               },
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close', style: TextStyle(color: Colors.grey)),
-          ),
-        ],
+        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close', style: TextStyle(color: Colors.grey)))],
       ),
     );
   }
@@ -1601,30 +1267,11 @@ class ContactSection extends StatelessWidget {
       children: [
         const Text('GET IN TOUCH', style: TextStyle(color: Color(0xFFE50914), fontWeight: FontWeight.bold, letterSpacing: 2)),
         const SizedBox(height: 24),
-        Text(
-          'Ready to build something amazing?',
-          textAlign: isMobile ? TextAlign.center : TextAlign.start,
-          style: TextStyle(fontSize: isMobile ? 32 : 56, fontWeight: FontWeight.w900, height: 1.1, letterSpacing: -1),
-        ),
+        Text('Ready to build something amazing?', textAlign: isMobile ? TextAlign.center : TextAlign.start, style: TextStyle(fontSize: isMobile ? 32 : 56, fontWeight: FontWeight.w900, height: 1.1, letterSpacing: -1)),
         const SizedBox(height: 32),
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 600),
-          child: Text(
-            'I\'m currently available for freelance work and full-time opportunities. Let\'s turn your vision into reality.',
-            textAlign: isMobile ? TextAlign.center : TextAlign.start,
-            style: TextStyle(
-              fontSize: isMobile ? 16 : 18, 
-              color: Theme.of(context).textTheme.bodyMedium?.color?.withAlpha(150), 
-              height: 1.6
-            ),
-          ),
-        ),
+        ConstrainedBox(constraints: const BoxConstraints(maxWidth: 600), child: Text('I\'m currently available for freelance work and full-time opportunities. Let\'s turn your vision into reality.', textAlign: isMobile ? TextAlign.center : TextAlign.start, style: TextStyle(fontSize: isMobile ? 16 : 18, color: Theme.of(context).textTheme.bodyMedium?.color?.withAlpha(150), height: 1.6))),
         const SizedBox(height: 48),
-        _ActionButton(
-          label: 'Start a Conversation', 
-          onPressed: () => _showConversationOptions(context), 
-          isPrimary: true
-        ),
+        _ActionButton(label: 'Start a Conversation', onPressed: () => _showConversationOptions(context), isPrimary: true),
       ],
     );
   }
@@ -1656,38 +1303,16 @@ class _CTile extends StatelessWidget {
           if (t == 'Email Me') uri = Uri.parse('mailto:$v');
           if (t == 'Call Me') uri = Uri.parse('tel:${v.split(' / ').first}');
           if (t == 'WhatsApp') uri = Uri.parse('https://wa.me/233559650921');
-          
-          if (uri != null && await canLaunchUrl(uri)) {
-            await launchUrl(uri);
-          }
+          if (uri != null && await canLaunchUrl(uri)) await launchUrl(uri);
         },
         child: Container(
           padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: Theme.of(context).dividerColor.withAlpha(5),
-            borderRadius: BorderRadius.circular(20),
-          ),
+          decoration: BoxDecoration(color: Theme.of(context).dividerColor.withAlpha(5), borderRadius: BorderRadius.circular(20)),
           child: Row(
             children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE50914).withAlpha(20),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(i, color: const Color(0xFFE50914), size: 24),
-              ),
+              Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: const Color(0xFFE50914).withAlpha(20), shape: BoxShape.circle), child: Icon(i, color: const Color(0xFFE50914), size: 24)),
               const SizedBox(width: 24),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(t, style: TextStyle(fontSize: 12, color: Theme.of(context).hintColor, fontWeight: FontWeight.w600, letterSpacing: 1)),
-                    const SizedBox(height: 4),
-                    Text(v, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                  ],
-                ),
-              ),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(t, style: TextStyle(fontSize: 12, color: Theme.of(context).hintColor, fontWeight: FontWeight.w600, letterSpacing: 1)), const SizedBox(height: 4), Text(v, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16), overflow: TextOverflow.ellipsis)])),
             ],
           ),
         ),
@@ -1698,40 +1323,25 @@ class _CTile extends StatelessWidget {
 
 class _StatItem extends StatelessWidget {
   final String v, l; const _StatItem({required this.v, required this.l});
-  @override
-  Widget build(BuildContext context) { 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(v, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFFE50914))), 
-        Text(l, textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: Theme.of(context).hintColor))
-      ]
-    ); 
+  @override Widget build(BuildContext context) { 
+    return Column(mainAxisSize: MainAxisSize.min, children: [Text(v, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFFE50914))), Text(l, textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: Theme.of(context).hintColor))]); 
   }
 }
 
 class SocialIconButton extends StatelessWidget {
-  final IconData icon; 
-  final String? url;
+  final IconData icon; final String? url;
   const SocialIconButton({super.key, required this.icon, this.url});
-
-  @override build(BuildContext context) { 
+  @override Widget build(BuildContext context) { 
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
         onTap: () async {
           if (url != null) {
             final uri = Uri.parse(url!);
-            if (await canLaunchUrl(uri)) {
-              await launchUrl(uri);
-            }
+            if (await canLaunchUrl(uri)) await launchUrl(uri);
           }
         },
-        child: Container(
-          padding: const EdgeInsets.all(12), 
-          decoration: BoxDecoration(color: Theme.of(context).dividerColor.withAlpha(8), shape: BoxShape.circle), 
-          child: Icon(icon, size: 20)
-        ),
+        child: Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Theme.of(context).dividerColor.withAlpha(8), shape: BoxShape.circle), child: Icon(icon, size: 20)),
       ),
     ); 
   }
@@ -1739,12 +1349,9 @@ class SocialIconButton extends StatelessWidget {
 
 class ProcessSection extends StatelessWidget {
   const ProcessSection({super.key});
-
-  @override
-  Widget build(BuildContext context) {
+  @override Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
     final isMobile = Responsive.isMobile(context);
-
     return Container(
       constraints: const BoxConstraints(maxWidth: 1400),
       padding: EdgeInsets.symmetric(horizontal: width * 0.08, vertical: 100),
@@ -1755,73 +1362,25 @@ class ProcessSection extends StatelessWidget {
           const SizedBox(height: 8),
           Text('How We Bring Ideas to Life', style: TextStyle(fontSize: isMobile ? 32 : 48, fontWeight: FontWeight.w900, letterSpacing: -1)),
           const SizedBox(height: 60),
-          Responsive(
-            mobile: Wrap(
-              spacing: 40,
-              runSpacing: 40,
-              alignment: WrapAlignment.center,
-              children: [
-                _buildStep(context, '01', 'Discovery', 'Deep dive into your goals and research.', Icons.search),
-                _buildStep(context, '02', 'Strategy', 'Defining the roadmap and architecture.', Icons.insights),
-                _buildStep(context, '03', 'Execution', 'High-speed development with precision.', Icons.code),
-                _buildStep(context, '04', 'Optimization', 'Scaling and refining for peak performance.', Icons.speed),
-              ],
-            ),
-            desktop: Row(
-              children: [
-                Expanded(child: _buildStep(context, '01', 'Discovery', 'Goals & Research', Icons.search)),
-                _arrow(),
-                Expanded(child: _buildStep(context, '02', 'Strategy', 'Roadmap & Design', Icons.insights)),
-                _arrow(),
-                Expanded(child: _buildStep(context, '03', 'Execution', 'Agile Development', Icons.code)),
-                _arrow(),
-                Expanded(child: _buildStep(context, '04', 'Optimization', 'Testing & Launch', Icons.speed)),
-              ],
-            ),
-          ),
+          if (isMobile) 
+            Wrap(spacing: 40, runSpacing: 40, alignment: WrapAlignment.center, children: [_buildStep(context, '01', 'Discovery', 'Deep dive into your goals and research.', Icons.search), _buildStep(context, '02', 'Strategy', 'Defining the roadmap and architecture.', Icons.insights), _buildStep(context, '03', 'Execution', 'High-speed development with precision.', Icons.code), _buildStep(context, '04', 'Optimization', 'Scaling and refining for peak performance.', Icons.speed)])
+          else 
+            Row(children: [Expanded(child: _buildStep(context, '01', 'Discovery', 'Goals & Research', Icons.search)), _arrow(), Expanded(child: _buildStep(context, '02', 'Strategy', 'Roadmap & Design', Icons.insights)), _arrow(), Expanded(child: _buildStep(context, '03', 'Execution', 'Agile Development', Icons.code)), _arrow(), Expanded(child: _buildStep(context, '04', 'Optimization', 'Testing & Launch', Icons.speed))]),
         ],
       ),
     );
   }
-
   Widget _buildStep(BuildContext context, String num, String title, String desc, IconData icon) {
-    return Container(
-      constraints: const BoxConstraints(maxWidth: 250),
-      child: Column(
-        children: [
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              color: const Color(0xFFE50914).withAlpha(15),
-              shape: BoxShape.circle,
-              border: Border.all(color: const Color(0xFFE50914).withAlpha(30)),
-            ),
-            child: Center(child: Text(num, style: const TextStyle(color: Color(0xFFE50914), fontWeight: FontWeight.w900, fontSize: 20))),
-          ),
-          const SizedBox(height: 24),
-          Text(title, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-          const SizedBox(height: 12),
-          Text(desc, textAlign: TextAlign.center, style: TextStyle(color: Theme.of(context).hintColor.withAlpha(150), fontSize: 14)),
-        ],
-      ),
-    );
+    return Container(constraints: const BoxConstraints(maxWidth: 250), child: Column(children: [Container(width: 80, height: 80, decoration: BoxDecoration(color: const Color(0xFFE50914).withAlpha(15), shape: BoxShape.circle, border: Border.all(color: const Color(0xFFE50914).withAlpha(30))), child: Center(child: Text(num, style: const TextStyle(color: Color(0xFFE50914), fontWeight: FontWeight.w900, fontSize: 20)))), const SizedBox(height: 24), Text(title, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)), const SizedBox(height: 12), Text(desc, textAlign: TextAlign.center, style: TextStyle(color: Theme.of(context).hintColor.withAlpha(150), fontSize: 14))]));
   }
-
-  Widget _arrow() => Padding(
-        padding: const EdgeInsets.only(bottom: 60),
-        child: Icon(Icons.keyboard_double_arrow_right_rounded, color: const Color(0xFFE50914).withAlpha(50), size: 30),
-      );
+  Widget _arrow() => Padding(padding: const EdgeInsets.only(bottom: 60), child: Icon(Icons.keyboard_double_arrow_right_rounded, color: const Color(0xFFE50914).withAlpha(50), size: 30));
 }
 
 class TestimonialsSection extends StatelessWidget {
   const TestimonialsSection({super.key});
-
-  @override
-  Widget build(BuildContext context) {
+  @override Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
     final isMobile = Responsive.isMobile(context);
-
     return Container(
       constraints: const BoxConstraints(maxWidth: 1400),
       padding: EdgeInsets.symmetric(horizontal: width * 0.08, vertical: 100),
@@ -1831,28 +1390,7 @@ class TestimonialsSection extends StatelessWidget {
           const SizedBox(height: 8),
           Text('What Our Partners Say', style: TextStyle(fontSize: isMobile ? 32 : 48, fontWeight: FontWeight.w900, letterSpacing: -1)),
           const SizedBox(height: 60),
-          Wrap(
-            spacing: 30,
-            runSpacing: 30,
-            alignment: WrapAlignment.center,
-            children: const [
-              _TestimonialCard(
-                quote: "Tech Raven transformed our outdated system into a high-performance machine. Their speed and precision are unmatched.",
-                author: "Sarah Johnson",
-                role: "CEO, Streamline Corp",
-              ),
-              _TestimonialCard(
-                quote: "Kyeremeh Clifford is a visionary leader. He doesn't just build apps; he builds businesses. Highly recommended.",
-                author: "David Chen",
-                role: "Founder, Fintech Solutions",
-              ),
-              _TestimonialCard(
-                quote: "The best agency I've ever worked with. The communication and delivery exceed expectations every single time.",
-                author: "Michael Peters",
-                role: "Product Manager, Global Tech",
-              ),
-            ],
-          ),
+          Wrap(spacing: 30, runSpacing: 30, alignment: WrapAlignment.center, children: const [_TestimonialCard(quote: "Tech Raven transformed our outdated system into a high-performance machine. Their speed and precision are unmatched.", author: "Sarah Johnson", role: "CEO, Streamline Corp"), _TestimonialCard(quote: "Kyeremeh Clifford is a visionary leader. He doesn't just build apps; he builds businesses. Highly recommended.", author: "David Chen", role: "Founder, Fintech Solutions"), _TestimonialCard(quote: "The best agency I've ever worked with. The communication and delivery exceed expectations every single time.", author: "Michael Peters", role: "Product Manager, Global Tech")]),
         ],
       ),
     );
@@ -1862,55 +1400,32 @@ class TestimonialsSection extends StatelessWidget {
 class _TestimonialCard extends StatelessWidget {
   final String quote, author, role;
   const _TestimonialCard({required this.quote, required this.author, required this.role});
-
-  @override
-  Widget build(BuildContext context) {
+  @override Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
+    final isMobile = width < 600;
     return Container(
       constraints: BoxConstraints(maxWidth: width < 480 ? width * 0.9 : 400),
-      padding: const EdgeInsets.all(40),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(32),
-        border: Border.all(color: Theme.of(context).dividerColor.withAlpha(15)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withAlpha(5),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          )
-        ],
-      ),
+      padding: EdgeInsets.all(isMobile ? 24 : 40),
+      decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: BorderRadius.circular(32), border: Border.all(color: Theme.of(context).dividerColor.withAlpha(15)), boxShadow: [BoxShadow(color: Colors.black.withAlpha(5), blurRadius: 20, offset: const Offset(0, 10))]),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Icon(Icons.format_quote_rounded, color: Color(0xFFE50914), size: 40),
           const SizedBox(height: 20),
-          Text(
-            quote,
-            style: TextStyle(
-              fontSize: 16,
-              height: 1.6,
-              fontStyle: FontStyle.italic,
-              color: Theme.of(context).textTheme.bodyMedium?.color?.withAlpha(200),
-            ),
-          ),
+          Text(quote, style: TextStyle(fontSize: 16, height: 1.6, fontStyle: FontStyle.italic, color: Theme.of(context).textTheme.bodyMedium?.color?.withAlpha(200))),
           const SizedBox(height: 30),
           Row(
             children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: const BoxDecoration(color: Color(0xFFE50914), shape: BoxShape.circle),
-                child: Center(child: Text(author[0], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
-              ),
+              Container(width: 40, height: 40, decoration: const BoxDecoration(color: Color(0xFFE50914), shape: BoxShape.circle), child: Center(child: Text(author[0], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)))),
               const SizedBox(width: 15),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(author, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                  Text(role, style: TextStyle(color: Theme.of(context).hintColor, fontSize: 12)),
-                ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(author, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16), overflow: TextOverflow.ellipsis, maxLines: 1),
+                    Text(role, style: TextStyle(color: Theme.of(context).hintColor, fontSize: 12), overflow: TextOverflow.ellipsis, maxLines: 1),
+                  ],
+                ),
               ),
             ],
           ),
@@ -1922,23 +1437,15 @@ class _TestimonialCard extends StatelessWidget {
 
 class Footer extends StatelessWidget {
   const Footer({super.key});
-  @override build(BuildContext context) { 
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 40), 
-      child: Center(
-        child: Text(
-          '© 2024 TECH RAVEN. POWERED BY KYEREMEH CLIFFORD.', 
-          style: TextStyle(color: Theme.of(context).hintColor.withAlpha(100), fontSize: 10, letterSpacing: 2)
-        )
-      )
-    ); 
+  @override Widget build(BuildContext context) { 
+    return Container(padding: const EdgeInsets.symmetric(vertical: 40), child: Center(child: Text('© 2024 TECH RAVEN. POWERED BY KYEREMEH CLIFFORD.', style: TextStyle(color: Theme.of(context).hintColor.withAlpha(100), fontSize: 10, letterSpacing: 2)))); 
   }
 }
 
 class FadeInAnimation extends StatelessWidget {
   final Widget child; final int delay;
   const FadeInAnimation({super.key, required this.child, this.delay = 0});
-  @override build(BuildContext context) {
+  @override Widget build(BuildContext context) {
     return TweenAnimationBuilder(tween: Tween<double>(begin: 0, end: 1), duration: const Duration(milliseconds: 1000), curve: Curves.easeOutQuart, builder: (context, value, child) => Opacity(opacity: value, child: Transform.translate(offset: Offset(0, 40 * (1 - value)), child: child)), child: child);
   }
 }

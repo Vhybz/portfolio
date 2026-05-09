@@ -5,6 +5,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:intl/intl.dart';
+import 'responsive.dart';
 
 class ReceiptPage extends StatefulWidget {
   const ReceiptPage({super.key});
@@ -221,7 +222,7 @@ class _ReceiptPageState extends State<ReceiptPage> {
             flex: 5,
             child: pw.Column(
               children: [
-                pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [pw.Text('Subtotal:'), pw.Text('$_currency ${(_total).toStringAsFixed(2)}', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))]),
+                pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [pw.Text('Subtotal:'), pw.Text('$_currency ${_total.toStringAsFixed(2)}', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))]),
                 pw.Divider(),
                 pw.Container(
                   padding: const pw.EdgeInsets.all(10),
@@ -415,7 +416,7 @@ class _ReceiptPageState extends State<ReceiptPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('PORTAL GENERATOR', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 2, fontSize: 16)),
+        title: FittedBox(child: Text(_documentSelection + ' GENERATOR', style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 2, fontSize: 16))),
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
@@ -439,8 +440,8 @@ class _ReceiptPageState extends State<ReceiptPage> {
             Expanded(
               flex: 2,
               child: Container(
-                margin: const EdgeInsets.fromLTRB(40, 100, 20, 40),
-                padding: const EdgeInsets.all(40),
+                margin: EdgeInsets.fromLTRB(Responsive.isMobile(context) ? 10 : 40, 100, Responsive.isMobile(context) ? 10 : 20, 40),
+                padding: EdgeInsets.all(Responsive.isMobile(context) ? 15 : 40),
                 decoration: BoxDecoration(
                   color: isDark ? Colors.white.withAlpha(5) : Colors.white,
                   borderRadius: BorderRadius.circular(32),
@@ -452,14 +453,17 @@ class _ReceiptPageState extends State<ReceiptPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        Wrap(
+                          alignment: WrapAlignment.spaceBetween,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: 10,
+                          runSpacing: 10,
                           children: [
-                            const Text('Configuration', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                            Text(_documentSelection == 'CONTRACT' ? 'Contract Details' : 'Invoice Config', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                             _currencyDropdown(),
                           ],
                         ),
-                        const SizedBox(height: 40),
+                        const SizedBox(height: 30),
                         _inputLabel('CLIENT / COMPANY NAME'),
                         TextFormField(
                           controller: _clientController,
@@ -496,9 +500,9 @@ class _ReceiptPageState extends State<ReceiptPage> {
                               children: [
                                 TextButton(
                                   onPressed: _clearZeroItems,
-                                  child: const Text('Clean Up', style: TextStyle(color: Colors.orange)),
+                                  child: const Text('Clean', style: TextStyle(color: Colors.orange, fontSize: 12)),
                                 ),
-                                IconButton(onPressed: _addItem, icon: const Icon(Icons.add_circle_outline, color: Color(0xFFE50914))),
+                                IconButton(onPressed: _addItem, icon: const Icon(Icons.add_circle_outline, color: Color(0xFFE50914), size: 20)),
                               ],
                             ),
                           ],
@@ -529,22 +533,37 @@ class _ReceiptPageState extends State<ReceiptPage> {
           ],
         ),
       ),
+      floatingActionButton: width <= 1000 ? FloatingActionButton(
+        backgroundColor: const Color(0xFFE50914),
+        child: const Icon(Icons.picture_as_pdf),
+        onPressed: () {
+          Navigator.of(context).push(MaterialPageRoute(
+            builder: (context) => Scaffold(
+              appBar: AppBar(title: const Text('Document Preview')),
+              body: PdfPreview(
+                build: (format) => _generatePdf(format),
+                canChangePageFormat: false,
+              ),
+            ),
+          ));
+        },
+      ) : null,
     );
   }
 
   Widget _documentSelector() {
     return Container(
-      margin: const EdgeInsets.only(right: 20),
-      padding: const EdgeInsets.symmetric(horizontal: 12),
+      margin: const EdgeInsets.only(right: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(
         color: const Color(0xFFE50914).withAlpha(30),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           value: _documentSelection,
           dropdownColor: const Color(0xFF150202),
-          style: const TextStyle(color: Color(0xFFE50914), fontWeight: FontWeight.bold, fontSize: 12),
+          style: const TextStyle(color: Color(0xFFE50914), fontWeight: FontWeight.bold, fontSize: 11),
           onChanged: (String? newValue) {
             setState(() {
               _documentSelection = newValue!;
@@ -564,13 +583,14 @@ class _ReceiptPageState extends State<ReceiptPage> {
 
   Widget _currencyDropdown() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(color: const Color(0xFFE50914).withAlpha(10), borderRadius: BorderRadius.circular(10)),
-      child: DropdownButton<String>(
-        value: _currency,
-        underline: const SizedBox(),
-        onChanged: (v) => setState(() => _currency = v!),
-        items: ['GHS', r'$', '£', '€'].map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontWeight: FontWeight.bold)))).toList(),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: _currency,
+          onChanged: (v) => setState(() => _currency = v!),
+          items: ['GHS', r'$', '£', '€'].map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)))).toList(),
+        ),
       ),
     );
   }
@@ -578,14 +598,34 @@ class _ReceiptPageState extends State<ReceiptPage> {
   Widget _buildItemEntry(int index, Map<String, dynamic> item) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
-        children: [
-          Expanded(flex: 3, child: TextFormField(key: ValueKey('name_$index'), initialValue: item['name'], decoration: _inputDecoration('Item'), onChanged: (v) => setState(() => item['name'] = v))),
-          const SizedBox(width: 10),
-          Expanded(flex: 1, child: TextFormField(key: ValueKey('price_$index'), initialValue: item['price'] == 0 ? '' : item['price'].toString(), decoration: _inputDecoration('Price'), keyboardType: TextInputType.number, onChanged: (v) => setState(() => item['price'] = double.tryParse(v) ?? 0.0))),
-          IconButton(icon: const Icon(Icons.delete_outline, color: Colors.red), onPressed: () => _removeItem(index)),
-        ],
-      ),
+      child: Responsive.isMobile(context) 
+        ? Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.grey.withAlpha(10),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Column(
+              children: [
+                TextFormField(key: ValueKey('name_$index'), initialValue: item['name'], decoration: _inputDecoration('Item Name'), onChanged: (v) => setState(() => item['name'] = v)),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(child: TextFormField(key: ValueKey('price_$index'), initialValue: item['price'] == 0 ? '' : item['price'].toString(), decoration: _inputDecoration('Price'), keyboardType: TextInputType.number, onChanged: (v) => setState(() => item['price'] = double.tryParse(v) ?? 0.0))),
+                    IconButton(icon: const Icon(Icons.delete_outline, color: Colors.red), onPressed: () => _removeItem(index)),
+                  ],
+                ),
+              ],
+            ),
+          )
+        : Row(
+            children: [
+              Expanded(flex: 4, child: TextFormField(key: ValueKey('name_$index'), initialValue: item['name'], decoration: _inputDecoration('Item Name'), onChanged: (v) => setState(() => item['name'] = v))),
+              const SizedBox(width: 10),
+              Expanded(flex: 2, child: TextFormField(key: ValueKey('price_$index'), initialValue: item['price'] == 0 ? '' : item['price'].toString(), decoration: _inputDecoration('Price'), keyboardType: TextInputType.number, onChanged: (v) => setState(() => item['price'] = double.tryParse(v) ?? 0.0))),
+              IconButton(icon: const Icon(Icons.delete_outline, color: Colors.red), onPressed: () => _removeItem(index)),
+            ],
+          ),
     );
   }
 
@@ -593,8 +633,10 @@ class _ReceiptPageState extends State<ReceiptPage> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(color: const Color(0xFFE50914).withAlpha(15), borderRadius: BorderRadius.circular(15)),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Wrap(
+        alignment: WrapAlignment.spaceBetween,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: 10,
         children: [
           const Text('Total Investment:', style: TextStyle(fontWeight: FontWeight.bold)),
           Text('$_currency ${_total.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Color(0xFFE50914))),
