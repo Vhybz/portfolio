@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
+import 'package:url_launcher/url_launcher.dart';
+import 'receipt_page.dart';
+import 'resume_page.dart';
+import 'responsive.dart';
 
 void main() {
   runApp(const MyApp());
@@ -136,10 +140,16 @@ class _PortfolioPageState extends State<PortfolioPage> {
                   Center(
                     child: Column(
                       children: [
-                        HeroSection(key: _homeKey, profilePicKey: _profilePicKey),
+                        HeroSection(
+                          key: _homeKey, 
+                          profilePicKey: _profilePicKey,
+                          onViewProjects: () => _scrollTo(_projectsKey),
+                        ),
                         AboutAndSkillsSection(aboutKey: _aboutKey, skillsKey: _skillsKey),
+                        const ProcessSection(),
                         ProjectsSection(key: _projectsKey),
                         ServicesSection(key: _servicesKey),
+                        const TestimonialsSection(),
                         const TechnologiesSection(),
                         ContactSection(key: _contactKey),
                         const Footer(),
@@ -202,7 +212,7 @@ class _RealisticRavenState extends State<RealisticRaven> with TickerProviderStat
     if (widget.targetKey.currentContext != null) {
       final RenderBox box = widget.targetKey.currentContext!.findRenderObject() as RenderBox;
       final position = box.localToGlobal(Offset.zero);
-      return Offset(position.dx + box.size.width / 2 - 50, position.dy - 65);
+      return Offset(position.dx + box.size.width / 2 - 50, position.dy - 82);
     }
     return _currentPos;
   }
@@ -298,14 +308,18 @@ class _RealisticRavenState extends State<RealisticRaven> with TickerProviderStat
           double bob = _isStanding ? math.sin(_bobController.value * math.pi) * 2 : 0;
           return Transform.translate(
             offset: Offset(0, bob),
-            child: CustomPaint(
-              size: const Size(100, 80), 
-              painter: RavenPainter(
-                flapValue: _isStanding ? 0.2 : (_isGliding ? 0.1 : _flapController.value), 
-                isStanding: _isStanding,
-                headTurn: _headTurn,
-                isGliding: _isGliding,
-                isDark: Theme.of(context).brightness == Brightness.dark,
+            child: Transform.scale(
+              scale: 0.4,
+              alignment: Alignment.bottomCenter,
+              child: CustomPaint(
+                size: const Size(100, 80), 
+                painter: RavenPainter(
+                  flapValue: _isStanding ? 0.2 : (_isGliding ? 0.1 : _flapController.value), 
+                  isStanding: _isStanding,
+                  headTurn: _headTurn,
+                  isGliding: _isGliding,
+                  isDark: Theme.of(context).brightness == Brightness.dark,
+                ),
               ),
             ),
           );
@@ -338,13 +352,10 @@ class RavenPainter extends CustomPainter {
     final path = Path();
     
     canvas.save();
-    // Center alignment for forward-facing look
     canvas.translate(size.width / 2, size.height / 2);
 
-    // Head
     path.addOval(Rect.fromCircle(center: Offset(headTurn * 15, -20), radius: 15));
     
-    // Beak (Forward facing, centered)
     final beakPath = Path();
     beakPath.moveTo(headTurn * 25 - 5, -25);
     beakPath.lineTo(headTurn * 25 + 5, -25);
@@ -352,10 +363,8 @@ class RavenPainter extends CustomPainter {
     beakPath.close();
     path.addPath(beakPath, Offset.zero);
 
-    // Body
     path.addOval(Rect.fromCenter(center: const Offset(0, 5), width: 40, height: 50));
 
-    // Wings
     double flap = (flapValue - 0.5) * 2;
     if (isStanding) flap = 0.8;
     if (isGliding) flap = -0.1;
@@ -379,12 +388,10 @@ class RavenPainter extends CustomPainter {
 
     canvas.drawPath(path, bodyPaint);
 
-    // Eyes (Forward facing)
     double eyeOffsetX = headTurn * 15;
     canvas.drawCircle(Offset(eyeOffsetX - 6, -22), 2.5, eyePaint);
     canvas.drawCircle(Offset(eyeOffsetX + 6, -22), 2.5, eyePaint);
     
-    // Eye glow
     final glowPaint = Paint()
       ..color = const Color(0xFF00B2FF).withAlpha(40)
       ..style = PaintingStyle.fill
@@ -428,7 +435,7 @@ class Navbar extends StatelessWidget {
                 const SizedBox(width: 30),
                 _buildThemeToggle(context),
                 const SizedBox(width: 20),
-                _buildCVButton(),
+                _buildCVButton(context),
               ] else ...[
                 _buildThemeToggle(context, small: true),
                 IconButton(
@@ -511,17 +518,88 @@ class Navbar extends StatelessWidget {
     );
   }
 
-  Widget _buildCVButton() {
-    return ElevatedButton(
-      onPressed: () {},
-      style: ElevatedButton.styleFrom(
-        backgroundColor: const Color(0xFFE50914),
-        foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
-        elevation: 0,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+  Widget _buildCVButton(BuildContext context) {
+    return Row(
+      children: [
+        OutlinedButton(
+          onPressed: () => _showAuthDialog(context),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: const Color(0xFFE50914),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+            side: const BorderSide(color: Color(0xFFE50914)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+          child: const Text('Receipts', style: TextStyle(fontWeight: FontWeight.bold)),
+        ),
+        const SizedBox(width: 12),
+        ElevatedButton(
+          onPressed: () {
+            Navigator.of(context).push(MaterialPageRoute(builder: (context) => const ResumePage()));
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFFE50914),
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
+            elevation: 0,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+          child: const Text('Resume', style: TextStyle(fontWeight: FontWeight.bold)),
+        ),
+      ],
+    );
+  }
+
+  void _showAuthDialog(BuildContext context) {
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        title: const Text('Access Restricted', style: TextStyle(fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Please enter the administrative ID to access the Receipt Generator.'),
+            const SizedBox(height: 20),
+            TextField(
+              controller: controller,
+              obscureText: true,
+              decoration: InputDecoration(
+                hintText: 'Admin ID',
+                filled: true,
+                fillColor: Theme.of(context).dividerColor.withAlpha(10),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel', style: TextStyle(color: Theme.of(context).hintColor)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (controller.text == 'kkrasta') {
+                Navigator.pop(context);
+                Navigator.of(context).push(MaterialPageRoute(builder: (context) => const ReceiptPage()));
+              } else {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Invalid ID. Access Denied.')),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFE50914),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text('Access'),
+          ),
+        ],
       ),
-      child: const Text('Resume', style: TextStyle(fontWeight: FontWeight.bold)),
     );
   }
 
@@ -555,6 +633,15 @@ class AppDrawer extends StatelessWidget {
               children: [
                 const DrawerHeader(child: Center(child: Text('TECH RAVEN', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xFFE50914), letterSpacing: 3)))),
                 ...keys.entries.map((e) => ListTile(title: Text(e.key), onTap: () => onItemTap(e.value))),
+                const Divider(),
+                ListTile(
+                  leading: const Icon(Icons.receipt_long, color: Color(0xFFE50914)),
+                  title: const Text('Generate Receipt'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showAuthDialog(context);
+                  },
+                ),
               ],
             ),
           ),
@@ -573,78 +660,98 @@ class AppDrawer extends StatelessWidget {
       ),
     );
   }
-}
 
-class Responsive extends StatelessWidget {
-  final Widget mobile;
-  final Widget? tablet;
-  final Widget desktop;
-
-  const Responsive({
-    super.key,
-    required this.mobile,
-    this.tablet,
-    required this.desktop,
-  });
-
-  static bool isMobile(BuildContext context) =>
-      MediaQuery.of(context).size.width < 800;
-
-  static bool isTablet(BuildContext context) =>
-      MediaQuery.of(context).size.width >= 800 &&
-      MediaQuery.of(context).size.width < 1200;
-
-  static bool isDesktop(BuildContext context) =>
-      MediaQuery.of(context).size.width >= 1200;
-
-  @override
-  Widget build(BuildContext context) {
-    final double width = MediaQuery.of(context).size.width;
-    if (width >= 1200) {
-      return desktop;
-    } else if (width >= 800 && tablet != null) {
-      return tablet!;
-    } else {
-      return mobile;
-    }
+  void _showAuthDialog(BuildContext context) {
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        title: const Text('Access Restricted', style: TextStyle(fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Please enter the administrative ID to access the Receipt Generator.'),
+            const SizedBox(height: 20),
+            TextField(
+              controller: controller,
+              obscureText: true,
+              decoration: InputDecoration(
+                hintText: 'Admin ID',
+                filled: true,
+                fillColor: Theme.of(context).dividerColor.withAlpha(10),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel', style: TextStyle(color: Theme.of(context).hintColor)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (controller.text == 'kkrasta') {
+                Navigator.pop(context);
+                Navigator.of(context).push(MaterialPageRoute(builder: (context) => const ReceiptPage()));
+              } else {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Invalid ID. Access Denied.')),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFE50914),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text('Access'),
+          ),
+        ],
+      ),
+    );
   }
 }
 
 class HeroSection extends StatelessWidget {
   final GlobalKey profilePicKey;
-  const HeroSection({super.key, required this.profilePicKey});
+  final VoidCallback onViewProjects;
+  const HeroSection({super.key, required this.profilePicKey, required this.onViewProjects});
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
     final isMobile = Responsive.isMobile(context);
-    final isDesktop = Responsive.isDesktop(context);
+    final isTablet = Responsive.isTablet(context);
     
     return Container(
       constraints: const BoxConstraints(maxWidth: 1400),
       padding: EdgeInsets.symmetric(
         horizontal: width * 0.08, 
-        vertical: isMobile ? 60 : (isDesktop ? 150 : 100)
+        vertical: isMobile ? 80 : (isTablet ? 100 : 150)
       ),
       child: Responsive(
         mobile: Column(
           children: [
-            _buildImage(isMobile),
+            _buildImage(context, isMobile),
             const SizedBox(height: 60),
-            _buildText(context, isMobile),
+            _buildText(context, isMobile, isTablet),
           ],
         ),
         desktop: Row(
           children: [
-            Expanded(flex: 3, child: _buildText(context, isMobile)),
+            Expanded(flex: 3, child: _buildText(context, isMobile, isTablet)),
             const SizedBox(width: 50),
-            Expanded(flex: 2, child: _buildImage(isMobile)),
+            Expanded(flex: 2, child: _buildImage(context, isMobile)),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildText(BuildContext context, bool isMobile) {
+  Widget _buildText(BuildContext context, bool isMobile, bool isTablet) {
     return FadeInAnimation(
       child: Column(
         crossAxisAlignment: isMobile ? CrossAxisAlignment.center : CrossAxisAlignment.start,
@@ -664,10 +771,10 @@ class HeroSection extends StatelessWidget {
             TextSpan(
               text: 'Kyeremeh ',
               style: TextStyle(
-                fontSize: isMobile ? 48 : 80,
+                fontSize: isMobile ? 42 : (isTablet ? 60 : 80),
                 fontWeight: FontWeight.w900,
                 letterSpacing: -2,
-                height: 1,
+                height: 1.1,
               ),
               children: const [
                 TextSpan(
@@ -682,7 +789,7 @@ class HeroSection extends StatelessWidget {
           ),
           const SizedBox(height: 20),
           Text(
-            'Full Stack Developer | Flutter Expert | UI Designer',
+            'Founder & CEO of Tech Raven | Full Stack Architect',
             textAlign: isMobile ? TextAlign.center : TextAlign.start,
             style: TextStyle(
               fontSize: isMobile ? 18 : 22,
@@ -691,13 +798,13 @@ class HeroSection extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 30),
-          SizedBox(
-            width: 600,
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 600),
             child: Text(
-              'Master of full-stack ecosystems at Tech Raven, architecting high-performance digital solutions that redefine industry standards. I transform visionary ideas into elite applications.',
+              'Founder and CEO of Tech Raven, leading the vision for high-performance digital ecosystems. I specialize in architecting elite applications that transform visionary ideas into industry-leading solutions.',
               textAlign: isMobile ? TextAlign.center : TextAlign.start,
               style: TextStyle(
-                fontSize: 18,
+                fontSize: isMobile ? 16 : 18,
                 color: Theme.of(context).textTheme.bodyMedium?.color?.withAlpha(200),
                 height: 1.7,
               ),
@@ -711,13 +818,19 @@ class HeroSection extends StatelessWidget {
             children: [
               _ActionButton(
                 label: 'View My Projects',
-                onPressed: () {},
+                onPressed: onViewProjects,
                 isPrimary: true,
               ),
               _ActionButton(
                 label: 'Contact Me',
-                onPressed: () {},
+                onPressed: () async {
+                  final uri = Uri.parse('https://wa.me/233559650921');
+                  if (await canLaunchUrl(uri)) {
+                    await launchUrl(uri);
+                  }
+                },
                 isPrimary: false,
+                icon: Icons.chat_bubble_outline,
               ),
             ],
           ),
@@ -725,13 +838,13 @@ class HeroSection extends StatelessWidget {
           Row(
             mainAxisAlignment: isMobile ? MainAxisAlignment.center : MainAxisAlignment.start,
             children: const [
-              SocialIconButton(icon: Icons.code),
+              SocialIconButton(icon: Icons.code, url: 'https://github.com/Vhybz'),
               SizedBox(width: 15),
-              SocialIconButton(icon: Icons.terminal),
+              SocialIconButton(icon: Icons.chat_bubble_outline, url: 'https://wa.me/233559650921'),
               SizedBox(width: 15),
-              SocialIconButton(icon: Icons.link),
+              SocialIconButton(icon: Icons.link, url: 'https://linkedin.com'),
               SizedBox(width: 15),
-              SocialIconButton(icon: Icons.email_outlined),
+              SocialIconButton(icon: Icons.email_outlined, url: 'mailto:techraven11@gmail.com'),
             ],
           ),
         ],
@@ -739,33 +852,44 @@ class HeroSection extends StatelessWidget {
     );
   }
 
-  Widget _buildImage(bool isMobile) {
+  Widget _buildImage(BuildContext context, bool isMobile) {
+    final size = MediaQuery.of(context).size;
+    final imageSize = isMobile ? size.width * 0.7 : 420.0;
+    
     return FadeInAnimation(
       delay: 300,
       child: Stack(
         alignment: Alignment.center,
         children: [
-          _glowCircle(isMobile ? 300 : 500, 0.08),
+          _glowCircle(imageSize * 1.3, 0.1),
+          _glowCircle(imageSize * 1.15, 0.05),
           Container(
-            key: profilePicKey,
-            width: isMobile ? 250 : 400,
-            height: isMobile ? 250 : 400,
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              border: Border.all(color: const Color(0xFFE50914), width: 8),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFFE50914).withAlpha(100),
-                  blurRadius: 50,
-                  spreadRadius: 10,
-                ),
-              ],
+              border: Border.all(color: const Color(0xFFE50914).withAlpha(30), width: 2),
             ),
-            clipBehavior: Clip.antiAlias,
-            child: Image.asset(
-              'assets/images/pic.jpg',
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => const Icon(Icons.person, size: 100, color: Colors.white10),
+            child: Container(
+              key: profilePicKey,
+              width: imageSize,
+              height: imageSize,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFFE50914), width: 6),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFE50914).withAlpha(80),
+                    blurRadius: 40,
+                    spreadRadius: 5,
+                  ),
+                ],
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Image.asset(
+                'assets/images/pic.jpg',
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => const Icon(Icons.person, size: 100, color: Colors.white10),
+              ),
             ),
           ),
         ],
@@ -788,45 +912,67 @@ class HeroSection extends StatelessWidget {
       );
 }
 
-class _ActionButton extends StatelessWidget {
+class _ActionButton extends StatefulWidget {
   final String label;
   final VoidCallback onPressed;
   final bool isPrimary;
+  final IconData? icon;
 
   const _ActionButton({
     required this.label,
     required this.onPressed,
     required this.isPrimary,
+    this.icon,
   });
 
   @override
+  State<_ActionButton> createState() => _ActionButtonState();
+}
+
+class _ActionButtonState extends State<_ActionButton> {
+  bool _isHovered = false;
+
+  @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: isPrimary
-            ? [
-                BoxShadow(
-                  color: const Color(0xFFE50914).withAlpha(60),
-                  blurRadius: 20,
-                  offset: const Offset(0, 10),
-                )
-              ]
-            : null,
-      ),
-      child: ElevatedButton(
-        onPressed: onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: isPrimary ? const Color(0xFFE50914) : Colors.transparent,
-          foregroundColor: isPrimary ? Colors.white : Theme.of(context).colorScheme.primary,
-          padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
-          elevation: 0,
-          side: isPrimary ? null : BorderSide(color: Theme.of(context).colorScheme.primary.withAlpha(100)),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: widget.isPrimary
+              ? [
+                  BoxShadow(
+                    color: const Color(0xFFE50914).withAlpha(60),
+                    blurRadius: 20,
+                    offset: const Offset(0, 10),
+                  )
+                ]
+              : null,
         ),
-        child: Text(
-          label,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+        child: ElevatedButton(
+          onPressed: widget.onPressed,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: widget.isPrimary ? const Color(0xFFE50914) : Colors.transparent,
+            foregroundColor: widget.isPrimary ? Colors.white : Theme.of(context).colorScheme.primary,
+            padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
+            elevation: 0,
+            side: widget.isPrimary ? null : BorderSide(color: Theme.of(context).colorScheme.primary.withAlpha(100)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (widget.icon != null && _isHovered) ...[
+                Icon(widget.icon, size: 20),
+                const SizedBox(width: 10),
+              ],
+              Text(
+                widget.label,
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -839,35 +985,47 @@ class AboutAndSkillsSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
+    final isMobile = Responsive.isMobile(context);
+    final isTablet = Responsive.isTablet(context);
 
     return Container(
       constraints: const BoxConstraints(maxWidth: 1400),
-      padding: EdgeInsets.symmetric(horizontal: width * 0.08, vertical: 100),
-      child: Responsive(
-        mobile: Column(
-          children: [
+      padding: EdgeInsets.symmetric(horizontal: width * 0.08, vertical: isMobile ? 60 : 100),
+      child: Column(
+        children: [
+          if (isMobile) ...[
             _buildAbout(context),
-            const SizedBox(height: 40),
-            _buildHighlights(context),
-            const SizedBox(height: 40),
+            const SizedBox(height: 30),
             _buildSkills(context),
+            const SizedBox(height: 30),
+            _buildHighlights(context),
+          ] else if (isTablet) ...[
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(flex: 1, child: _buildAbout(context)),
+                const SizedBox(width: 30),
+                Expanded(flex: 1, child: _buildSkills(context)),
+              ],
+            ),
+            const SizedBox(height: 30),
+            _buildHighlights(context),
+          ] else ...[
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(flex: 2, child: _buildAbout(context)),
+                const SizedBox(width: 30),
+                Expanded(flex: 2, child: _buildSkills(context)),
+                const SizedBox(width: 30),
+                Expanded(flex: 1, child: _buildHighlights(context)),
+              ],
+            ),
           ],
-        ),
-        desktop: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(flex: 2, child: _buildAbout(context)),
-            const SizedBox(width: 30),
-            Expanded(flex: 2, child: _buildSkills(context)),
-            const SizedBox(width: 30),
-            Expanded(flex: 1, child: _buildHighlights(context)),
-          ],
-        ),
+        ],
       ),
     );
-  }
-
-  Widget _buildAbout(BuildContext context) {
+  }  Widget _buildAbout(BuildContext context) {
     return _card(
       context: context,
       key: aboutKey,
@@ -877,7 +1035,7 @@ class AboutAndSkillsSection extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'I\'m a passionate developer at Tech Raven specializing in high-impact mobile and web applications. I love turning ideas into real products that provide meaningful value to users.',
+            'As the Founder and CEO of Tech Raven, I lead the technical vision and strategy for high-impact mobile and web applications. I am dedicated to building products that not only function flawlessly but also redefine industry benchmarks.',
             style: TextStyle(
               fontSize: 16,
               height: 1.8,
@@ -928,22 +1086,28 @@ class AboutAndSkillsSection extends StatelessWidget {
       context: context,
       icon: Icons.star_outline,
       title: 'Highlights',
-      content: Wrap(
-        runSpacing: 30,
-        spacing: 30,
-        alignment: WrapAlignment.center,
-        children: const [
-          _StatItem(v: '5+', l: 'Years Exp'),
-          _StatItem(v: '100+', l: 'Projects'),
-          _StatItem(v: '50+', l: 'Clients'),
-        ],
+      content: SizedBox(
+        width: double.infinity,
+        child: Wrap(
+          runSpacing: 25,
+          spacing: 25,
+          alignment: WrapAlignment.center,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: const [
+            _StatItem(v: '5+', l: 'Years Exp'),
+            _StatItem(v: '100+', l: 'Projects'),
+            _StatItem(v: '50+', l: 'Clients'),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _card({required BuildContext context, Key? key, required IconData icon, required String title, required Widget content}) => Container(
+  Widget _card({required BuildContext context, Key? key, required IconData icon, required String title, required Widget content}) {
+    final isSmall = MediaQuery.of(context).size.width < 1200;
+    return Container(
         key: key,
-        padding: const EdgeInsets.all(40),
+        padding: EdgeInsets.all(isSmall ? 24 : 40),
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(32),
@@ -970,13 +1134,16 @@ class AboutAndSkillsSection extends StatelessWidget {
                   child: Icon(icon, color: const Color(0xFFE50914), size: 24),
                 ),
                 const SizedBox(width: 16),
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 22, 
-                    fontWeight: FontWeight.bold, 
-                    letterSpacing: -0.5,
-                    color: Theme.of(context).textTheme.titleLarge?.color,
+                Expanded(
+                  child: Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 22, 
+                      fontWeight: FontWeight.bold, 
+                      letterSpacing: -0.5,
+                      color: Theme.of(context).textTheme.titleLarge?.color,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
@@ -986,6 +1153,7 @@ class AboutAndSkillsSection extends StatelessWidget {
           ],
         ),
       );
+  }
 
   Widget _sBar(String s, double l) => Padding(
         padding: const EdgeInsets.only(bottom: 20),
@@ -1019,10 +1187,11 @@ class ProjectsSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
     final isMobile = Responsive.isMobile(context);
+    final isTablet = Responsive.isTablet(context);
     
     return Container(
       constraints: const BoxConstraints(maxWidth: 1400),
-      padding: EdgeInsets.symmetric(horizontal: width * 0.08, vertical: 100),
+      padding: EdgeInsets.symmetric(horizontal: width * 0.08, vertical: isMobile ? 60 : 100),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1030,13 +1199,15 @@ class ProjectsSection extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('PORTFOLIO', style: TextStyle(color: Color(0xFFE50914), fontWeight: FontWeight.bold, letterSpacing: 2, fontSize: 14)),
-                  const SizedBox(height: 8),
-                  Text('Featured Projects', style: TextStyle(fontSize: isMobile ? 32 : 48, fontWeight: FontWeight.w900, letterSpacing: -1)),
-                ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('PORTFOLIO', style: TextStyle(color: Color(0xFFE50914), fontWeight: FontWeight.bold, letterSpacing: 2, fontSize: 14)),
+                    const SizedBox(height: 8),
+                    Text('Featured Projects', style: TextStyle(fontSize: isMobile ? 32 : (isTablet ? 40 : 48), fontWeight: FontWeight.w900, letterSpacing: -1)),
+                  ],
+                ),
               ),
               if (!isMobile)
                 TextButton(
@@ -1054,10 +1225,10 @@ class ProjectsSection extends StatelessWidget {
           const SizedBox(height: 60),
           GridView.builder(
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: width > 1400 ? 3 : (width > 900 ? 2 : 1),
+              crossAxisCount: width > 1200 ? 3 : (width > 700 ? 2 : 1),
               crossAxisSpacing: 30,
               mainAxisSpacing: 30,
-              childAspectRatio: 1.2,
+              childAspectRatio: isMobile ? 1.1 : 1.25,
             ),
             itemCount: 5,
             shrinkWrap: true,
@@ -1099,7 +1270,7 @@ class _PCardState extends State<_PCard> {
       onExit: (_) => setState(() => h = false),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
-        transform: h ? (Matrix4.identity()..translate(0.0, -10.0)) : Matrix4.identity(),
+        transform: h ? (Matrix4.identity()..setTranslationRaw(0.0, -10.0, 0.0)) : Matrix4.identity(),
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(24),
@@ -1152,23 +1323,24 @@ class ServicesSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
     final isMobile = Responsive.isMobile(context);
+    final isTablet = Responsive.isTablet(context);
     
     return Container(
       constraints: const BoxConstraints(maxWidth: 1400),
-      padding: EdgeInsets.symmetric(horizontal: width * 0.08, vertical: 100),
+      padding: EdgeInsets.symmetric(horizontal: width * 0.08, vertical: isMobile ? 60 : 100),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text('SERVICES', style: TextStyle(color: Color(0xFFE50914), fontWeight: FontWeight.bold, letterSpacing: 2, fontSize: 14)),
           const SizedBox(height: 8),
-          Text('What I Offer', style: TextStyle(fontSize: isMobile ? 32 : 48, fontWeight: FontWeight.w900, letterSpacing: -1)),
+          Text('What I Offer', style: TextStyle(fontSize: isMobile ? 32 : (isTablet ? 40 : 48), fontWeight: FontWeight.w900, letterSpacing: -1)),
           const SizedBox(height: 60),
           GridView.count(
-            crossAxisCount: width > 1200 ? 3 : (width > 800 ? 2 : 1),
+            crossAxisCount: width > 1200 ? 3 : (width > 700 ? 2 : 1),
             shrinkWrap: true,
             crossAxisSpacing: 30,
             mainAxisSpacing: 30,
-            childAspectRatio: 1.4,
+            childAspectRatio: isMobile ? 1.3 : 1.5,
             physics: const NeverScrollableScrollPhysics(),
             children: const [
               _SCard(i: Icons.smartphone, t: 'App Development', d: 'High-performance native and cross-platform mobile apps.'),
@@ -1183,9 +1355,7 @@ class ServicesSection extends StatelessWidget {
       ),
     );
   }
-}
-
-class _SCard extends StatelessWidget {
+}class _SCard extends StatelessWidget {
   final IconData i;
   final String t, d;
   const _SCard({required this.i, required this.t, required this.d});
@@ -1290,35 +1460,87 @@ class ContactSection extends StatelessWidget {
     
     return Container(
       constraints: const BoxConstraints(maxWidth: 1400),
-      padding: EdgeInsets.symmetric(horizontal: width * 0.08, vertical: 100),
+      padding: EdgeInsets.symmetric(horizontal: width * 0.08, vertical: isMobile ? 60 : 100),
       child: Container(
-        padding: EdgeInsets.all(isMobile ? 40 : 80),
+        padding: EdgeInsets.all(isMobile ? 30 : 80),
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surface,
-          borderRadius: BorderRadius.circular(40),
+          borderRadius: BorderRadius.circular(isMobile ? 32 : 40),
           border: Border.all(color: Theme.of(context).dividerColor.withAlpha(15)),
-          image: DecorationImage(
-            image: const AssetImage('assets/images/dots_pattern.png'),
-            opacity: 0.05,
-            repeat: ImageRepeat.repeat,
-          ),
         ),
         child: Responsive(
           mobile: Column(
             children: [
               _buildContactText(context, isMobile),
               const SizedBox(height: 60),
-              _buildContactInfo(),
+              _buildContactInfo(context),
             ],
           ),
           desktop: Row(
             children: [
               Expanded(flex: 3, child: _buildContactText(context, isMobile)),
               const SizedBox(width: 80),
-              Expanded(flex: 2, child: _buildContactInfo()),
+              Expanded(flex: 2, child: _buildContactInfo(context)),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  void _showConversationOptions(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: const Text('Start a Conversation', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(color: const Color(0xFFE50914).withAlpha(20), shape: BoxShape.circle),
+                child: const Icon(Icons.email_outlined, color: Color(0xFFE50914), size: 20),
+              ),
+              title: const Text('Email Me', style: TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: const Text('techraven11@gmail.com', style: TextStyle(fontSize: 12)),
+              onTap: () async {
+                final uri = Uri.parse('mailto:techraven11@gmail.com');
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri);
+                }
+                Navigator.pop(context);
+              },
+            ),
+            const Divider(height: 1),
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(color: const Color(0xFFE50914).withAlpha(20), shape: BoxShape.circle),
+                child: const Icon(Icons.chat_bubble_outline, color: Color(0xFFE50914), size: 20),
+              ),
+              title: const Text('WhatsApp', style: TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: const Text('0559650921', style: TextStyle(fontSize: 12)),
+              onTap: () async {
+                final uri = Uri.parse('https://wa.me/233559650921');
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri);
+                }
+                Navigator.pop(context);
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close', style: TextStyle(color: Colors.grey)),
+          ),
+        ],
       ),
     );
   }
@@ -1332,32 +1554,41 @@ class ContactSection extends StatelessWidget {
         Text(
           'Ready to build something amazing?',
           textAlign: isMobile ? TextAlign.center : TextAlign.start,
-          style: TextStyle(fontSize: isMobile ? 36 : 56, fontWeight: FontWeight.w900, height: 1.1, letterSpacing: -1),
+          style: TextStyle(fontSize: isMobile ? 32 : 56, fontWeight: FontWeight.w900, height: 1.1, letterSpacing: -1),
         ),
         const SizedBox(height: 32),
-        Text(
-          'I\'m currently available for freelance work and full-time opportunities. Let\'s turn your vision into reality.',
-          textAlign: isMobile ? TextAlign.center : TextAlign.start,
-          style: TextStyle(
-            fontSize: 18, 
-            color: Theme.of(context).textTheme.bodyMedium?.color?.withAlpha(150), 
-            height: 1.6
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 600),
+          child: Text(
+            'I\'m currently available for freelance work and full-time opportunities. Let\'s turn your vision into reality.',
+            textAlign: isMobile ? TextAlign.center : TextAlign.start,
+            style: TextStyle(
+              fontSize: isMobile ? 16 : 18, 
+              color: Theme.of(context).textTheme.bodyMedium?.color?.withAlpha(150), 
+              height: 1.6
+            ),
           ),
         ),
         const SizedBox(height: 48),
-        _ActionButton(label: 'Start a Conversation', onPressed: () {}, isPrimary: true),
+        _ActionButton(
+          label: 'Start a Conversation', 
+          onPressed: () => _showConversationOptions(context), 
+          isPrimary: true
+        ),
       ],
     );
   }
 
-  Widget _buildContactInfo() {
+  Widget _buildContactInfo(BuildContext context) {
     return Column(
       children: const [
-        _CTile(i: Icons.email_outlined, t: 'Email Me', v: 'hello@techraven.com'),
-        SizedBox(height: 30),
-        _CTile(i: Icons.phone_outlined, t: 'Call Me', v: '+233 123 456 789'),
-        SizedBox(height: 30),
-        _CTile(i: Icons.location_on_outlined, t: 'Location', v: 'Accra, Ghana / Remote'),
+        _CTile(i: Icons.email_outlined, t: 'Email Me', v: 'techraven11@gmail.com'),
+        SizedBox(height: 20),
+        _CTile(i: Icons.phone_outlined, t: 'Call Me', v: '+233 559 650 921 / +233 503 574 865'),
+        SizedBox(height: 20),
+        _CTile(i: Icons.chat_bubble_outline, t: 'WhatsApp', v: '0559650921'),
+        SizedBox(height: 20),
+        _CTile(i: Icons.location_on_outlined, t: 'Location', v: 'Sunyani, Ghana'),
       ],
     );
   }
@@ -1367,34 +1598,49 @@ class _CTile extends StatelessWidget {
   final IconData i; final String t, v;
   const _CTile({required this.i, required this.t, required this.v});
   @override Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Theme.of(context).dividerColor.withAlpha(5),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFE50914).withAlpha(20),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(i, color: const Color(0xFFE50914), size: 24),
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: () async {
+          Uri? uri;
+          if (t == 'Email Me') uri = Uri.parse('mailto:$v');
+          if (t == 'Call Me') uri = Uri.parse('tel:${v.split(' / ').first}');
+          if (t == 'WhatsApp') uri = Uri.parse('https://wa.me/233559650921');
+          
+          if (uri != null && await canLaunchUrl(uri)) {
+            await launchUrl(uri);
+          }
+        },
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Theme.of(context).dividerColor.withAlpha(5),
+            borderRadius: BorderRadius.circular(20),
           ),
-          const SizedBox(width: 24),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(t, style: TextStyle(fontSize: 12, color: Theme.of(context).hintColor, fontWeight: FontWeight.w600, letterSpacing: 1)),
-                const SizedBox(height: 4),
-                Text(v, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              ],
-            ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE50914).withAlpha(20),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(i, color: const Color(0xFFE50914), size: 24),
+              ),
+              const SizedBox(width: 24),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(t, style: TextStyle(fontSize: 12, color: Theme.of(context).hintColor, fontWeight: FontWeight.w600, letterSpacing: 1)),
+                    const SizedBox(height: 4),
+                    Text(v, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -1405,17 +1651,223 @@ class _StatItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) { 
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Text(v, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFFE50914))), 
-        Text(l, style: TextStyle(fontSize: 12, color: Theme.of(context).hintColor))
+        Text(l, textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: Theme.of(context).hintColor))
       ]
     ); 
   }
 }
 
 class SocialIconButton extends StatelessWidget {
-  final IconData icon; const SocialIconButton({super.key, required this.icon});
-  @override build(BuildContext context) { return Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Theme.of(context).dividerColor.withAlpha(8), shape: BoxShape.circle), child: Icon(icon, size: 20)); }
+  final IconData icon; 
+  final String? url;
+  const SocialIconButton({super.key, required this.icon, this.url});
+
+  @override build(BuildContext context) { 
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: () async {
+          if (url != null) {
+            final uri = Uri.parse(url!);
+            if (await canLaunchUrl(uri)) {
+              await launchUrl(uri);
+            }
+          }
+        },
+        child: Container(
+          padding: const EdgeInsets.all(12), 
+          decoration: BoxDecoration(color: Theme.of(context).dividerColor.withAlpha(8), shape: BoxShape.circle), 
+          child: Icon(icon, size: 20)
+        ),
+      ),
+    ); 
+  }
+}
+
+class ProcessSection extends StatelessWidget {
+  const ProcessSection({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    final isMobile = Responsive.isMobile(context);
+
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 1400),
+      padding: EdgeInsets.symmetric(horizontal: width * 0.08, vertical: 100),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('OUR PROCESS', style: TextStyle(color: Color(0xFFE50914), fontWeight: FontWeight.bold, letterSpacing: 2, fontSize: 14)),
+          const SizedBox(height: 8),
+          Text('How We Bring Ideas to Life', style: TextStyle(fontSize: isMobile ? 32 : 48, fontWeight: FontWeight.w900, letterSpacing: -1)),
+          const SizedBox(height: 60),
+          Responsive(
+            mobile: Wrap(
+              spacing: 40,
+              runSpacing: 40,
+              alignment: WrapAlignment.center,
+              children: [
+                _buildStep(context, '01', 'Discovery', 'Deep dive into your goals and research.', Icons.search),
+                _buildStep(context, '02', 'Strategy', 'Defining the roadmap and architecture.', Icons.insights),
+                _buildStep(context, '03', 'Execution', 'High-speed development with precision.', Icons.code),
+                _buildStep(context, '04', 'Optimization', 'Scaling and refining for peak performance.', Icons.speed),
+              ],
+            ),
+            desktop: Row(
+              children: [
+                Expanded(child: _buildStep(context, '01', 'Discovery', 'Goals & Research', Icons.search)),
+                _arrow(),
+                Expanded(child: _buildStep(context, '02', 'Strategy', 'Roadmap & Design', Icons.insights)),
+                _arrow(),
+                Expanded(child: _buildStep(context, '03', 'Execution', 'Agile Development', Icons.code)),
+                _arrow(),
+                Expanded(child: _buildStep(context, '04', 'Optimization', 'Testing & Launch', Icons.speed)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStep(BuildContext context, String num, String title, String desc, IconData icon) {
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 250),
+      child: Column(
+        children: [
+          Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              color: const Color(0xFFE50914).withAlpha(15),
+              shape: BoxShape.circle,
+              border: Border.all(color: const Color(0xFFE50914).withAlpha(30)),
+            ),
+            child: Center(child: Text(num, style: const TextStyle(color: Color(0xFFE50914), fontWeight: FontWeight.w900, fontSize: 20))),
+          ),
+          const SizedBox(height: 24),
+          Text(title, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+          const SizedBox(height: 12),
+          Text(desc, textAlign: TextAlign.center, style: TextStyle(color: Theme.of(context).hintColor.withAlpha(150), fontSize: 14)),
+        ],
+      ),
+    );
+  }
+
+  Widget _arrow() => Padding(
+        padding: const EdgeInsets.only(bottom: 60),
+        child: Icon(Icons.keyboard_double_arrow_right_rounded, color: const Color(0xFFE50914).withAlpha(50), size: 30),
+      );
+}
+
+class TestimonialsSection extends StatelessWidget {
+  const TestimonialsSection({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    final isMobile = Responsive.isMobile(context);
+
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 1400),
+      padding: EdgeInsets.symmetric(horizontal: width * 0.08, vertical: 100),
+      child: Column(
+        children: [
+          const Text('TESTIMONIALS', style: TextStyle(color: Color(0xFFE50914), fontWeight: FontWeight.bold, letterSpacing: 2, fontSize: 14)),
+          const SizedBox(height: 8),
+          Text('What Our Partners Say', style: TextStyle(fontSize: isMobile ? 32 : 48, fontWeight: FontWeight.w900, letterSpacing: -1)),
+          const SizedBox(height: 60),
+          Wrap(
+            spacing: 30,
+            runSpacing: 30,
+            alignment: WrapAlignment.center,
+            children: const [
+              _TestimonialCard(
+                quote: "Tech Raven transformed our outdated system into a high-performance machine. Their speed and precision are unmatched.",
+                author: "Sarah Johnson",
+                role: "CEO, Streamline Corp",
+              ),
+              _TestimonialCard(
+                quote: "Kyeremeh Clifford is a visionary leader. He doesn't just build apps; he builds businesses. Highly recommended.",
+                author: "David Chen",
+                role: "Founder, Fintech Solutions",
+              ),
+              _TestimonialCard(
+                quote: "The best agency I've ever worked with. The communication and delivery exceed expectations every single time.",
+                author: "Michael Peters",
+                role: "Product Manager, Global Tech",
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TestimonialCard extends StatelessWidget {
+  final String quote, author, role;
+  const _TestimonialCard({required this.quote, required this.author, required this.role});
+
+  @override
+  Widget build(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    return Container(
+      constraints: BoxConstraints(maxWidth: width < 480 ? width * 0.9 : 400),
+      padding: const EdgeInsets.all(40),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(32),
+        border: Border.all(color: Theme.of(context).dividerColor.withAlpha(15)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(5),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          )
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.format_quote_rounded, color: Color(0xFFE50914), size: 40),
+          const SizedBox(height: 20),
+          Text(
+            quote,
+            style: TextStyle(
+              fontSize: 16,
+              height: 1.6,
+              fontStyle: FontStyle.italic,
+              color: Theme.of(context).textTheme.bodyMedium?.color?.withAlpha(200),
+            ),
+          ),
+          const SizedBox(height: 30),
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: const BoxDecoration(color: Color(0xFFE50914), shape: BoxShape.circle),
+                child: Center(child: Text(author[0], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
+              ),
+              const SizedBox(width: 15),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(author, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  Text(role, style: TextStyle(color: Theme.of(context).hintColor, fontSize: 12)),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class Footer extends StatelessWidget {
